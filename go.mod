@@ -10,7 +10,7 @@ require (
 	github.com/icza/dyno v0.0.0-20200205103839-49cb13720835
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.4
 	github.com/thedevsaddam/gojsonq/v2 v2.5.2
 	github.com/zclconf/go-cty v1.10.0
 	github.com/zclconf/go-cty-yaml v1.0.2
@@ -124,7 +124,7 @@ require (
 	google.golang.org/grpc v1.46.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/component-base v0.24.0 // indirect
 	k8s.io/klog/v2 v2.60.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42 // indirect
