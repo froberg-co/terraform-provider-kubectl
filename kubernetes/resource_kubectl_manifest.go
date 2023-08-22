@@ -204,7 +204,9 @@ metadata:
 				if len(metaObjLive.Raw.GetAnnotations()) == 0 {
 					meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "annotations")
 				}
-
+				if len(metaObjLive.Raw.GetLabels()) == 0 {
+					meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "labels")
+				}
 				yamlParsed, err := metaObjLive.AsYAML()
 				if err != nil {
 					return []*schema.ResourceData{}, fmt.Errorf("failed to convert manifest to yaml: %+v", err)
