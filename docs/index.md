@@ -1,6 +1,6 @@
 # Kubectl Provider
 
-This provider is the best way of managing Kubernetes resources in Terraform, by allowing you to use the thing 
+This provider is the best way of managing Kubernetes resources in Terraform, by allowing you to use the thing
 Kubernetes loves best - yaml!
 
 This core of this provider is the `kubectl_manifest` resource, allowing free-form yaml to be processed and applied against Kubernetes.
@@ -22,7 +22,7 @@ terraform {
 
   required_providers {
     kubectl = {
-      source  = "dfroberg/kubectl"
+      source  = "froberg-co/kubectl"
       version = ">= 2.0.0"
     }
   }
@@ -31,8 +31,8 @@ terraform {
 
 #### Install manually
 
-If you don't want to use the one-liner above, you can download a binary for your system from the [release page](https://github.com/dfroberg/terraform-provider-kubectl/releases), 
-then either place it at the root of your Terraform folder or in the Terraform plugin folder on your system. 
+If you don't want to use the one-liner above, you can download a binary for your system from the [release page](https://github.com/froberg-co/terraform-provider-kubectl/releases),
+then either place it at the root of your Terraform folder or in the Terraform plugin folder on your system.
 
 ## Configuration
 
@@ -104,14 +104,13 @@ provider "kubectl" {
 
 The provider has an additional parameter `apply_retry_count` that allows kubernetes commands to be retried on failure.
 This is useful if you have flaky CRDs or network connections and need to wait for the cluster state to be back in quorum.
-This applies to both create and update operations. 
+This applies to both create and update operations.
 
 ```hcl
 provider "kubectl" {
   apply_retry_count = 15
 }
 ```
-
 
 ## Example
 
