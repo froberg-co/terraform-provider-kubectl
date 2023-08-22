@@ -12,7 +12,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/stretchr/testify v1.7.0
 	github.com/thedevsaddam/gojsonq/v2 v2.5.2
-	github.com/zclconf/go-cty v1.10.0
+	github.com/zclconf/go-cty v1.13.2
 	github.com/zclconf/go-cty-yaml v1.0.2
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.24.0
