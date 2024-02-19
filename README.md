@@ -1,6 +1,5 @@
 # Kubernetes "kubectl" Provider 
 
-![Build Status](https://github.com/froberg-co/terraform-provider-kubectl/actions/workflows/tests.yaml/badge.svg) [![user guide](https://img.shields.io/badge/-user%20guide-blue)](https://registry.terraform.io/providers/froberg-co/kubectl)
 ![Build Status](https://github.com/froberg-co/terraform-provider-kubectl/actions/workflows/tests.yml/badge.svg) [![user guide](https://img.shields.io/badge/-user%20guide-blue)](https://registry.terraform.io/providers/froberg-co/kubectl)
 
 This provider offers the most effective method for handling Kubernetes resources in Terraform. It empowers you to leverage what Kubernetes values most - YAML!
@@ -128,7 +127,7 @@ If all went well, you should see a following message during the apply:
 │ Warning: Provider development overrides are in effect
 │ 
 │ The following provider development overrides are set in the CLI configuration:
-│  - froberg-co/kubectl in /USERNAME/alekc/go/bin
+│  - froberg-co/kubectl in /Users/USERNAME/go/bin
 
 $ go get github.com/froberg-co/terraform-provider-kubectl
 ```
