@@ -4,6 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/mitchellh/go-homedir"
@@ -19,13 +27,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	aggregator "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	"log"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func Provider() *schema.Provider {
@@ -222,7 +223,9 @@ func (p *KubeProvider) ToRESTMapper() (meta.RESTMapper, error) {
 	discoveryClient, _ := p.ToDiscoveryClient()
 	if discoveryClient != nil {
 		mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
-		expander := restmapper.NewShortcutExpander(mapper, discoveryClient)
+		expander := restmapper.NewShortcutExpander(mapper, discoveryClient, func(a string) {
+			_ = fmt.Errorf("unexpected warning message %s", a) // Fix: Assign the result of fmt.Errorf to a variable or use it in some way.
+		})
 		return expander, nil
 	}
 
