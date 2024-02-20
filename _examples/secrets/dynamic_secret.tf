@@ -1,5 +1,5 @@
 locals {
-  argocd_namespace = "mock-namespace"
+  argocd_namespace = "default"
 }
 
 variable "mock_data" {
