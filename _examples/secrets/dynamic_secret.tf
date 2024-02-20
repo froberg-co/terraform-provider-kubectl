@@ -18,7 +18,6 @@ variable "mock_data" {
 }
 
 resource "kubectl_manifest" "argocd_applications_credentials_bare_secrets" {
-  provider         = kubectl
   sensitive_fields = ["stringData"]
   apply_only       = true
   force_new        = true
