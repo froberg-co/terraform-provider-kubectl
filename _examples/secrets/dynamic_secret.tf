@@ -16,7 +16,7 @@ locals {
 #     }
 #   }
 # }
-resource "kubectl_manifest" "argocd_applications_credentials_bare_secrets_generic" {
+resource "kubectl_manifest" "test" {
   sensitive_fields = ["stringData"]
   apply_only       = true
   force_new        = true
@@ -26,7 +26,7 @@ resource "kubectl_manifest" "argocd_applications_credentials_bare_secrets_generi
     kind       = "Secret"
     type       = "Opaque"
     metadata = {
-      name      = "name-here-generic-repo-secret"
+      name      = "name-here"
       namespace = local.argocd_namespace
       annotations = {
         "managed-by" : "argocd.argoproj.io"
@@ -56,7 +56,7 @@ resource "kubectl_manifest" "argocd_applications_credentials_bare_secrets_generi
     }
   })
 }
-resource "kubectl_manifest" "argocd_applications_credentials_bare_secrets_mock2" {
+resource "kubectl_manifest" "test_mock" {
   sensitive_fields = ["stringData"]
   apply_only       = true
   force_new        = true
@@ -66,7 +66,7 @@ resource "kubectl_manifest" "argocd_applications_credentials_bare_secrets_mock2"
     kind       = "Secret"
     type       = "Opaque"
     metadata = {
-      name      = "name-here-mock2-repo-secret"
+      name      = "name-here-mock"
       namespace = local.argocd_namespace
       annotations = {
         "managed-by" : "argocd.argoproj.io"
