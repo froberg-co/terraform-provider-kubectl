@@ -16,46 +16,7 @@ locals {
 #     }
 #   }
 # }
-resource "kubectl_manifest" "test" {
-  sensitive_fields = ["stringData"]
-  apply_only       = true
-  force_new        = true
 
-  yaml_body = yamlencode({
-    apiVersion = "v1"
-    kind       = "Secret"
-    type       = "Opaque"
-    metadata = {
-      name      = "name-here"
-      namespace = local.argocd_namespace
-      annotations = {
-        "managed-by" : "argocd.argoproj.io"
-        "argocd.argoproj.io/compare-options" : "IgnoreExtra"
-        "argocd.argoproj.io/sync-options" : "Prune=false"
-      }
-      labels = {
-        "argocd.argoproj.io/secret-type" : "repo-creds"
-        "app.kubernetes.io/part-of" : "argocd"
-        "app.kubernetes.io/name" : "argocd-secret"
-      }
-    }
-
-    stringData = length(regexall("git@", "git@github.com/mock1/repo.git")) > 0 ? {
-      name          = "generic-repo"
-      insecure      = tostring(false)
-      sshPrivateKey = "mock-ssh-private-key"
-      type          = "git"
-      url           = "git@github.com/mock1/repo.git"
-      } : {
-      name     = "generic-repo"
-      insecure = tostring(false)
-      username = "mock-username"
-      password = "mock-password"
-      type     = "git"
-      url      = "git@github.com/mock1/repo.git"
-    }
-  })
-}
 resource "kubectl_manifest" "test_mock" {
   sensitive_fields = ["stringData"]
   apply_only       = true
