@@ -5,14 +5,15 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"k8s.io/cli-runtime/pkg/genericiooptions"
-	k8sdelete "k8s.io/kubectl/pkg/cmd/delete"
 	"log"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	k8sdelete "k8s.io/kubectl/pkg/cmd/delete"
 
 	"github.com/froberg-co/terraform-provider-kubectl/flatten"
 	"github.com/froberg-co/terraform-provider-kubectl/internal/types"
@@ -346,12 +347,12 @@ var (
 		"yaml_incluster": {
 			Type:      schema.TypeString,
 			Computed:  true,
-			Sensitive: true,
+			Sensitive: false,
 		},
 		"live_manifest_incluster": {
 			Type:      schema.TypeString,
 			Computed:  true,
-			Sensitive: true,
+			Sensitive: false,
 		},
 		"api_version": {
 			Type:     schema.TypeString,
@@ -381,7 +382,7 @@ var (
 		"yaml_body": {
 			Type:      schema.TypeString,
 			Required:  true,
-			Sensitive: true,
+			Sensitive: false,
 		},
 		"yaml_body_parsed": {
 			Type:        schema.TypeString,
