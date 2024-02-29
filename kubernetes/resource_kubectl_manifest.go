@@ -200,6 +200,7 @@ metadata:
 				meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "resourceVersion")
 				meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "selfLink")
 				meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "uid")
+				meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "generation")
 				meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
 
 				if len(metaObjLive.Raw.GetAnnotations()) == 0 {
