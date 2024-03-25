@@ -24,7 +24,7 @@ website/node_modules
 *.test
 *.iml
 dist
-
+.envrc
 website/vendor
 
 # Test exclusions
