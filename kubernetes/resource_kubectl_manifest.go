@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sergi/go-diff/diffmatchpatch"
+
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	k8sdelete "k8s.io/kubectl/pkg/cmd/delete"
 
@@ -311,7 +313,11 @@ metadata:
 			stateYaml := d.Get("yaml_incluster").(string)
 			liveStateYaml := d.Get("live_manifest_incluster").(string)
 			if stateYaml != liveStateYaml {
-				log.Printf("[TRACE] DETECTED YAML STATE %s vs %s", stateYaml, liveStateYaml)
+				log.Printf("[TRACE] DETECTED YAML STATE DIFFERENCE %s vs %s", stateYaml, liveStateYaml)
+				dmp := diffmatchpatch.New()
+				patches := dmp.PatchMake(stateYaml, liveStateYaml)
+				patchText := dmp.PatchToText(patches)
+				log.Printf("[DEBUG] DETECTED YAML INCLUSTER STATE DIFFERENCE. Patch diff: %s", patchText)
 				_ = d.SetNewComputed("yaml_incluster")
 			}
 
@@ -1019,8 +1025,7 @@ func getLiveManifestFingerprint(d *schema.ResourceData, userProvided *yaml.Manif
 		ignoreFields = expandStringList(ignoreFieldsRaw.([]interface{}))
 	}
 
-	fields := getLiveManifestFields_WithIgnoredFields(ignoreFields, userProvided, liveManifest)
-	return getFingerprint(fields)
+	return getLiveManifestFields_WithIgnoredFields(ignoreFields, userProvided, liveManifest)
 }
 
 func getFingerprint(s string) string {
@@ -1073,10 +1078,10 @@ func getLiveManifestFields_WithIgnoredFields(ignoredFields []string, userProvide
 		if _, exists := flattenedLive[userKey]; exists {
 			userKeys = append(userKeys, userKey)
 			normalizedLiveValue := strings.TrimSpace(flattenedLive[userKey])
-			flattenedUser[userKey] = normalizedLiveValue
 			if normalizedUserValue != normalizedLiveValue {
 				log.Printf("[TRACE] yaml drift detected in %s for %s, was: %s now: %s", userProvided.GetSelfLink(), userKey, normalizedUserValue, normalizedLiveValue)
 			}
+			flattenedUser[userKey] = getFingerprint(normalizedLiveValue)
 		} else {
 			if normalizedUserValue != "" {
 				log.Printf("[TRACE] yaml drift detected in %s for %s, was %s now blank", userProvided.GetSelfLink(), userKey, normalizedUserValue)
@@ -1085,12 +1090,12 @@ func getLiveManifestFields_WithIgnoredFields(ignoredFields []string, userProvide
 	}
 
 	sort.Strings(userKeys)
-	returnedValues := []string{}
+	var returnedValues []string
 	for _, k := range userKeys {
 		returnedValues = append(returnedValues, fmt.Sprintf("%s=%s", k, flattenedUser[k]))
 	}
 
-	return strings.Join(returnedValues, ",")
+	return strings.Join(returnedValues, "\n")
 }
 
 var kubernetesControlFields = []string{
