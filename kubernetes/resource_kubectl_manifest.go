@@ -196,12 +196,16 @@ metadata:
 				_ = d.Set("apply_only", false)
 
 				// clear out fields user can't set to try and get parity with yaml_body
-				meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "creationTimestamp")
-				meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "resourceVersion")
-				meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "selfLink")
-				meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "uid")
-				meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "generation")
-				meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
+				// remove any fields from the user provided set or control fields that we want to ignore
+				for _, field := range kubernetesControlFields {
+					meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", field)
+				}
+				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "creationTimestamp")
+				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "resourceVersion")
+				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "selfLink")
+				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "uid")
+				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "generation")
+				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
 
 				if len(metaObjLive.Raw.GetAnnotations()) == 0 {
 					meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "annotations")
