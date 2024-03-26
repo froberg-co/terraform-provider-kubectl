@@ -55,6 +55,21 @@ const (
 	TimedOutReason = "ProgressDeadlineExceeded"
 )
 
+// Recursive function to clean the map
+func cleanMap(m map[string]interface{}) {
+	for key, value := range m {
+		switch v := value.(type) {
+		case map[string]interface{}:
+			cleanMap(v)
+			if len(v) == 0 {
+				delete(m, key)
+			}
+			// case nil, interface{}:
+			// 	delete(m, key)
+		}
+	}
+}
+
 func resourceKubectlManifest() *schema.Resource {
 
 	return &schema.Resource{
@@ -176,6 +191,15 @@ metadata:
 				if metaObjLiveRaw.GetUID() == "" {
 					return []*schema.ResourceData{}, fmt.Errorf("failed to parse item and get UUID: %+v", metaObjLiveRaw)
 				}
+
+				// Clean metaObjLiveRaw from keys that are empty or have no values
+				metaObjLiveMap := metaObjLiveRaw.Object
+
+				// Clean the map
+				//cleanMap(metaObjLiveMap)
+
+				// Set the Object field of metaObjLiveRaw to the cleaned map
+				metaObjLiveRaw.Object = metaObjLiveMap
 
 				metaObjLive := yaml.NewFromUnstructured(metaObjLiveRaw)
 
