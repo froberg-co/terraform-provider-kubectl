@@ -199,16 +199,20 @@ metadata:
 
 				// clear out fields user can't set to try and get parity with yaml_body
 				// remove any fields from the user provided set or control fields that we want to ignore
+				// this is to ensure that the yaml_body is as close to the original as possible
 				for _, field := range kubernetesControlFields {
-					meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", field)
+					// ensure we traverse the fields in kubernetesControlFields to remove nested fields
+					fields := strings.Split(field, ".")
+					// remove the field
+					meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, fields...)
 				}
-				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "creationTimestamp")
-				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "resourceVersion")
-				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "selfLink")
-				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "uid")
-				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "generation")
-				// meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
 
+				// Remove status
+				//meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "status")
+				// Sepcial case for kubectl.kubernetes.io/last-applied-configuration
+				//ßmeta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
+
+				// clean up empty fields
 				if len(metaObjLive.Raw.GetAnnotations()) == 0 {
 					meta_v1_unstruct.RemoveNestedField(metaObjLive.Raw.Object, "metadata", "annotations")
 				}
@@ -219,6 +223,9 @@ metadata:
 				if err != nil {
 					return []*schema.ResourceData{}, fmt.Errorf("failed to convert manifest to yaml: %+v", err)
 				}
+				// log readable yaml_body and yaml_body_parsed
+				log.Printf("[TRACE] import yaml_body:\n%s", yamlString)
+				log.Printf("[TRACE] import yaml_body_parsed:\n%s", yamlParsed)
 
 				_ = d.Set("yaml_body", yamlParsed)
 				_ = d.Set("yaml_body_parsed", yamlParsed)
@@ -1099,6 +1106,8 @@ func getLiveManifestFields_WithIgnoredFields(ignoredFields []string, userProvide
 }
 
 var kubernetesControlFields = []string{
+	"metadata.annotations.kubectl.kubernetes.io/last-applied-configuration",
+	"metadata.deletionTimestamp",
 	"status",
 	"metadata.finalizers",
 	"metadata.initializers",
@@ -1107,6 +1116,6 @@ var kubernetesControlFields = []string{
 	"metadata.generation",
 	"metadata.resourceVersion",
 	"metadata.uid",
-	"metadata.annotations.kubectl.kubernetes.io/last-applied-configuration",
+	"metadata.selfLink",
 	"metadata.managedFields",
 }

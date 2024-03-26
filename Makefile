@@ -15,12 +15,12 @@ dist:
 	goreleaser build --single-target --skip-validate --rm-dist
 
 test:
-	go test -i $(TEST) || exit 1
+	go -v test -i $(TEST) || exit 1
 	echo $(TEST) | \
-		xargs -t -n4 go test $(TESTARGS) -timeout=30s -parallel=4
+		xargs -t -n4 go -v test $(TESTARGS) -timeout=30s -parallel=4
 
 testacc:
-	TF_ACC=1 go test ./kubernetes -v $(TESTARGS) -timeout 120m -count=1
+	TF_ACC=1 go test -v ./kubernetes -v $(TESTARGS) -timeout 120m -count=1
 
 publish:
 	goreleaser release --rm-dist
