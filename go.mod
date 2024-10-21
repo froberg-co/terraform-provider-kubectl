@@ -3,7 +3,7 @@ module github.com/froberg-co/terraform-provider-kubectl
 go 1.21.0
 
 require (
-	github.com/cenkalti/backoff/v4 v4.2.1
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/hashicorp/hcl/v2 v2.20.0
 	github.com/hashicorp/terraform v0.12.29
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.33.0
