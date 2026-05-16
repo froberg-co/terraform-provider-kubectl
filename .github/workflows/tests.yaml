@@ -66,14 +66,21 @@ jobs:
       - name: Diagnose cluster
         run: |
           set +e
+          esc() {
+            local s=$1
+            s=${s//'%'/'%25'}
+            s=${s//$'\r'/'%0D'}
+            s=${s//$'\n'/'%0A'}
+            printf '%s' "$s"
+          }
           KCF_EXISTS=$(test -f "$KUBECONFIG" && echo yes || echo no)
           KCF_SIZE=$(stat -c%s "$KUBECONFIG" 2>/dev/null || echo 0)
           CINFO=$(kubectl --kubeconfig "$KUBECONFIG" cluster-info 2>&1 | head -1 | tr -d '\n')
           NODES_OK=$(kubectl --kubeconfig "$KUBECONFIG" get nodes --no-headers 2>&1 | wc -l)
           KVERSION=$(kubectl --kubeconfig "$KUBECONFIG" version --client=true 2>&1 | head -1 | tr -d '\n')
-          echo "::notice title=Cluster diagnosis::KUBECONFIG=$KUBECONFIG exists=$KCF_EXISTS size=$KCF_SIZE nodes_count=$NODES_OK"
-          echo "::notice title=cluster-info::$CINFO"
-          echo "::notice title=kubectl version::$KVERSION"
+          echo "::notice title=Cluster diagnosis::KUBECONFIG=$(esc "$KUBECONFIG") exists=$KCF_EXISTS size=$KCF_SIZE nodes_count=$NODES_OK"
+          echo "::notice title=cluster-info::$(esc "$CINFO")"
+          echo "::notice title=kubectl version::$(esc "$KVERSION")"
       - name: Acceptance Tests
         env:
           KUBE_CONFIG_PATH: ${{ env.KUBECONFIG }}
@@ -81,12 +88,20 @@ jobs:
           TESTARGS: "-parallel 1"
         run: |
           set +e
-          OUT=$(make testacc 2>&1)
-          EXIT=$?
-          # Surface first error line + last 20 lines via annotations (visible without log download).
-          FIRST_FAIL=$(echo "$OUT" | grep -E "^(FAIL|--- FAIL|panic:|Error:|cannot run)" | head -1 | tr -d '\n')
-          TAIL=$(echo "$OUT" | tail -20 | tr '\n' '|')
-          echo "::notice title=testacc first-fail::$FIRST_FAIL"
-          echo "::notice title=testacc tail::$TAIL"
-          echo "$OUT"
-          exit $EXIT
+          esc() {
+            local s=$1
+            s=${s//'%'/'%25'}
+            s=${s//$'\r'/'%0D'}
+            s=${s//$'\n'/'%0A'}
+            printf '%s' "$s"
+          }
+          LOG=$(mktemp)
+          # Stream to the job log AND tee to a file for annotation extraction,
+          # so failures show up live and large outputs don't sit in a shell var.
+          make testacc 2>&1 | tee "$LOG"
+          EXIT=${PIPESTATUS[0]}
+          FIRST_FAIL=$(grep -E "^(FAIL|--- FAIL|panic:|Error:|cannot run)" "$LOG" | head -1 | tr -d '\n')
+          TAIL=$(tail -20 "$LOG")
+          echo "::notice title=testacc first-fail::$(esc "$FIRST_FAIL")"
+          echo "::notice title=testacc tail::$(esc "$TAIL")"
+          exit "$EXIT"
