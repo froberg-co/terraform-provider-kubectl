@@ -47,7 +47,7 @@ jobs:
     needs: get_version_matrix
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         terraform_version:  ${{ fromJson(needs.get_version_matrix.outputs.terraform_versions) }}
         k8s_version:  ${{ fromJson(needs.get_version_matrix.outputs.k8s_versions) }}
@@ -57,7 +57,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: helm/kind-action@v1.10.0
+      - uses: helm/kind-action@v1.14.0
         id: kind
         with:
           wait: 2m
