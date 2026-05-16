@@ -60,8 +60,17 @@ jobs:
       - uses: helm/kind-action@v1.14.0
         id: kind
         with:
-          wait: 2m
+          wait: 5m
           node_image: kindest/node:v${{ matrix.k8s_version }}
+          kubeconfig: ${{ env.KUBECONFIG }}
+      - name: Diagnose cluster
+        run: |
+          echo "KUBECONFIG=$KUBECONFIG"
+          ls -la "$KUBECONFIG" 2>&1 || echo "no kubeconfig at \$KUBECONFIG"
+          ls -la "$HOME/.kube/" 2>&1 || echo "no ~/.kube dir"
+          kubectl --kubeconfig "$KUBECONFIG" cluster-info 2>&1 | head -20 || true
+          kubectl --kubeconfig "$KUBECONFIG" get nodes -o wide 2>&1 || true
+          kubectl --kubeconfig "$KUBECONFIG" version --client=true 2>&1 || true
       - name: Acceptance Tests
         env:
           KUBE_CONFIG_PATH: ${{ env.KUBECONFIG }}
