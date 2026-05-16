@@ -65,16 +65,28 @@ jobs:
           kubeconfig: ${{ env.KUBECONFIG }}
       - name: Diagnose cluster
         run: |
-          echo "KUBECONFIG=$KUBECONFIG"
-          ls -la "$KUBECONFIG" 2>&1 || echo "no kubeconfig at \$KUBECONFIG"
-          ls -la "$HOME/.kube/" 2>&1 || echo "no ~/.kube dir"
-          kubectl --kubeconfig "$KUBECONFIG" cluster-info 2>&1 | head -20 || true
-          kubectl --kubeconfig "$KUBECONFIG" get nodes -o wide 2>&1 || true
-          kubectl --kubeconfig "$KUBECONFIG" version --client=true 2>&1 || true
+          set +e
+          KCF_EXISTS=$(test -f "$KUBECONFIG" && echo yes || echo no)
+          KCF_SIZE=$(stat -c%s "$KUBECONFIG" 2>/dev/null || echo 0)
+          CINFO=$(kubectl --kubeconfig "$KUBECONFIG" cluster-info 2>&1 | head -1 | tr -d '\n')
+          NODES_OK=$(kubectl --kubeconfig "$KUBECONFIG" get nodes --no-headers 2>&1 | wc -l)
+          KVERSION=$(kubectl --kubeconfig "$KUBECONFIG" version --client=true 2>&1 | head -1 | tr -d '\n')
+          echo "::notice title=Cluster diagnosis::KUBECONFIG=$KUBECONFIG exists=$KCF_EXISTS size=$KCF_SIZE nodes_count=$NODES_OK"
+          echo "::notice title=cluster-info::$CINFO"
+          echo "::notice title=kubectl version::$KVERSION"
       - name: Acceptance Tests
         env:
           KUBE_CONFIG_PATH: ${{ env.KUBECONFIG }}
           TF_ACC_TERRAFORM_VERSION: ${{ matrix.terraform_version }}
           TESTARGS: "-parallel 1"
         run: |
-          make testacc
+          set +e
+          OUT=$(make testacc 2>&1)
+          EXIT=$?
+          # Surface first error line + last 20 lines via annotations (visible without log download).
+          FIRST_FAIL=$(echo "$OUT" | grep -E "^(FAIL|--- FAIL|panic:|Error:|cannot run)" | head -1 | tr -d '\n')
+          TAIL=$(echo "$OUT" | tail -20 | tr '\n' '|')
+          echo "::notice title=testacc first-fail::$FIRST_FAIL"
+          echo "::notice title=testacc tail::$TAIL"
+          echo "$OUT"
+          exit $EXIT
