@@ -1,6 +1,6 @@
 module github.com/froberg-co/terraform-provider-kubectl
 
-go 1.21.0
+go 1.23.0
 
 require (
 	github.com/cenkalti/backoff/v4 v4.2.1
@@ -110,7 +110,7 @@ require (
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
-	golang.org/x/oauth2 v0.14.0 // indirect
+	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
