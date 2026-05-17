@@ -25,6 +25,7 @@
 
 Some examples live outside `_examples/` because they require cluster-side prerequisites that the acceptance-test walker can't satisfy (custom CRDs, operators, etc.):
 
+- [Install ArgoCD](../docs/guides/install-argocd.md) — fetch the upstream install YAML, split it with `kubectl_file_documents`, and manage every document as its own `kubectl_manifest`.
 - [Install the CockroachDB operator via an ArgoCD ApplicationSet](../docs/guides/argocd-cockroachdb-operator.md) — declares an ArgoCD `ApplicationSet` that installs `cockroach-operator` from Helm.
 
 ## CRDs

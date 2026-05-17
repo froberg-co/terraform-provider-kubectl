@@ -19,10 +19,10 @@ the generator from `list` to `cluster` or `git`.
 
 The target cluster must already have:
 
-- ArgoCD installed (so `argoproj.io/v1alpha1/ApplicationSet` and `Application` CRDs exist).
+- ArgoCD installed (so `argoproj.io/v1alpha1/ApplicationSet` and `Application` CRDs exist). See the [Install ArgoCD](./install-argocd.md) guide if you need the bootstrap.
 - The `cluster` your ApplicationSet targets registered with ArgoCD as a managed cluster (`in-cluster` is the default registration for ArgoCD's own cluster).
 
-A typical Terraform-only bootstrap orders the work as: install ArgoCD CRDs → install ArgoCD itself → declare ApplicationSets. Module those three concerns separately so the destroy path stays clean.
+A typical Terraform-only bootstrap orders the work as: install ArgoCD → declare ApplicationSets. Module those concerns separately so the destroy path stays clean.
 
 ## Terraform
 
