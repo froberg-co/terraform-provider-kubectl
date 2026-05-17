@@ -2,7 +2,7 @@
 
 Every `.tf` file in this directory is exercised by the `TestAcckubectlYaml` acceptance test, which walks the tree, substitutes the literal string `name-here` with a unique random string, then runs a `plan` / `apply` / `refresh` / `plan` loop against a real Kubernetes cluster.
 
-> Note: Each `.tf` file is tested in isolation. Multi-file TF configurations are not supported. Each file must declare a single `resource "kubectl_manifest" "test"` and use `name-here` for the Kubernetes object name.
+> Note: Each `.tf` file is tested in isolation — multi-file TF configurations are not supported. Each file must declare at least one `resource "kubectl_manifest" "test"` (the test framework checks this resource by name for existence/deletion); supporting `kubectl_manifest` resources may be declared alongside it in the same file (for example, when a CRD and an instance of it need to be installed together). Use `name-here` for the Kubernetes object name — the test framework substitutes this with a unique random string at run time.
 
 ## Basics
 

@@ -104,9 +104,9 @@ To compile the provider, run `make build`. This will build the provider and put 
 
 ### Building The Provider
 
-You can build the master branch of the provider by running 
+You can build the master branch of the provider by running
 ```sh
-git clone github.com/froberg-co/terraform-provider-kubectl
+git clone https://github.com/froberg-co/terraform-provider-kubectl.git
 cd terraform-provider-kubectl
 make build
 ```
@@ -123,7 +123,7 @@ provider_installation {
 }
 ```
 
-After that, `terraform init` is unnecessary — `terraform plan` / `apply` will pick up your local build directly. You should see this warning each time you run Terraform:
+After that, an *initial* `terraform init` is still needed in a fresh working directory (to create `.terraform/` and resolve modules), but you don't need to re-run init between rebuilds — `terraform plan` / `apply` pick up the new binary on every invocation. You should see this warning each time you run Terraform with the override in effect:
 
 ```text
 ╷

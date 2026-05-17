@@ -1,7 +1,7 @@
 # Hide arbitrary fields from Terraform plan output via `sensitive_fields`.
-# Defaults to ["data"] for v1/Secret manifests — set it explicitly to
-# obfuscate fields on non-Secret kinds (e.g. ConfigMap entries holding
-# tokens, MutatingWebhookConfiguration caBundles).
+# Defaults to ["data", "stringData"] for v1/Secret manifests — set it
+# explicitly to obfuscate fields on non-Secret kinds (e.g. ConfigMap
+# entries holding tokens, MutatingWebhookConfiguration caBundles).
 
 resource "kubectl_manifest" "test" {
   sensitive_fields = ["data.token"]

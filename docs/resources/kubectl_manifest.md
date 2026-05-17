@@ -109,7 +109,7 @@ YAML
 ## Argument Reference
 
 * `yaml_body` - Required. YAML to apply to kubernetes.
-* `sensitive_fields` - Optional. List of fields (dot-syntax) which are sensitive and should be obfuscated in output. Defaults to `["data"]` for Secrets.
+* `sensitive_fields` - Optional. List of fields (dot-syntax) which are sensitive and should be obfuscated in output. Defaults to `["data", "stringData"]` for `v1/Secret` manifests.
 * `force_new` - Optional. Forces delete & create of resources if the `yaml_body` changes. Default `false`.
 * `upgrade_api_version` - Optional. When `true`, changing the `apiVersion` in `yaml_body` updates the resource in-place rather than forcing a delete and recreate. Useful for migrating manifests across API versions (e.g. `autoscaling/v2beta1` → `autoscaling/v2`) without resource churn. Default `false`.
 * `server_side_apply` - Optional. Allow using server-side-apply method. Default `false`.
@@ -169,7 +169,7 @@ Required:
 
 You can obfuscate fields in the diff output by setting the `sensitive_fields` option. This allows you to hide arbitrary field content by suppressing the information in the diff.
 
-By default, this is set to `["data"]` for all `v1/Secret` manifests.
+By default, this is set to `["data", "stringData"]` for all `v1/Secret` manifests.
 
 The fields provided should use dot-separator syntax to specify the field to obfuscate.
 
