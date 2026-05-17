@@ -17,6 +17,10 @@
 - [Create a ClusterRole](./roles/clusterrole.tf)
 - [Dynamic Secret from variable](./secrets/dynamic_secret.tf)
 
+## Workloads
+
+- [Single-node CockroachDB StatefulSet](./cockroachdb/single_node.tf) — insecure-mode standalone instance backed by `emptyDir`; swap for a PVC + TLS in production.
+
 ## CRDs
 
 - [Apply a Couchbase CRD instance](./crds/couchbase.tf)
