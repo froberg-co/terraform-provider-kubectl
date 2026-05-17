@@ -79,6 +79,7 @@ YAML
 * `yaml_body` - Required. YAML to apply to kubernetes.
 * `sensitive_fields` - Optional. List of fields (dot-syntax) which are sensitive and should be obfuscated in output. Defaults to `["data"]` for Secrets.
 * `force_new` - Optional. Forces delete & create of resources if the `yaml_body` changes. Default `false`.
+* `upgrade_api_version` - Optional. When `true`, changing the `apiVersion` in `yaml_body` updates the resource in-place rather than forcing a delete and recreate. Useful for migrating manifests across API versions (e.g. `autoscaling/v2beta1` → `autoscaling/v2`) without resource churn. Default `false`.
 * `server_side_apply` - Optional. Allow using server-side-apply method. Default `false`.
 * `field_manager` - Optional. Override the default field manager name. This is only relevent when using server-side apply. Default `kubectl`.
 * `force_conflicts` - Optional. Allow using force_conflicts. Default `false`.
@@ -87,6 +88,7 @@ YAML
 * `override_namespace` - Optional. Override the namespace to apply the kubernetes resource to, ignoring any declared namespace in the `yaml_body`.
 * `validate_schema` - Optional. Setting to `false` will mimic `kubectl apply --validate=false` mode. Default `true`.
 * `wait` - Optional. Set this flag to wait or not for finalized to complete for deleted objects. Default `false`.
+* `delete_cascade` - Optional. Cascade mode for delete operations. One of `"Background"` or `"Foreground"`. When unset, defaults to `Background` unless `wait` is enabled, in which case it defaults to `Foreground`. Set this explicitly to match `kubectl`'s behaviour.
 * `wait_for_rollout` - Optional. Set this flag to wait or not for Deployments and APIService to complete rollout. Default `true`.
 * `wait_for`- Optional. If set, will wait until either all conditions are satisfied, or until timeout is reached (see [below for nested schema](#nestedblock--wait_for)). Under the hood [gojsonq](https://github.com/thedevsaddam/gojsonq) is used for querying, see the related syntax and examples
 
