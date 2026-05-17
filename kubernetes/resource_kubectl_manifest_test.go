@@ -62,7 +62,496 @@ YAML
 	})
 }
 
-func TestAccKubectl_WaitFor(t *testing.T) {
+func TestAccKubectl(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test" {
+  wait = true
+	yaml_body = <<YAML
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.14.2
+    readinessProbe:
+      httpGet:
+        path: "/"
+        port: 80
+      initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+			},
+		},
+	})
+}
+
+func TestAccKubectl_Wait(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test" {
+	wait = true
+	yaml_body = <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 80
+            initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+			},
+		},
+	})
+}
+
+func TestAccKubectl_WaitForeground(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test" {
+	wait = true
+  delete_cascade = "Foreground"
+	yaml_body = <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 80
+            initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+			},
+		},
+	})
+}
+
+func TestAccKubectl_WaitBackground(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test" {
+	wait = true
+  delete_cascade = "Background"
+	yaml_body = <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 80
+            initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+			},
+		},
+	})
+}
+
+func TestAccKubectl_WaitForRolloutDeployment(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test" {
+  wait_for_rollout = true
+	yaml_body = <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 80
+            initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+			},
+		},
+	})
+}
+
+func TestAccKubectl_WaitForRolloutDaemonSet(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test" {
+  wait_for_rollout = true
+	yaml_body = <<YAML
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 80
+            initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+			},
+		},
+	})
+}
+
+func TestAccKubectl_WaitForRolloutStatefulSet(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test" {
+  wait_for_rollout = true
+	yaml_body = <<YAML
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.14.2
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 80
+            initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+			},
+		},
+	})
+}
+
+func TestAccKubectl_RequireWaitForFieldOrCondition(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test" {
+	wait_for { }
+	yaml_body = <<YAML
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.14.2
+    readinessProbe:
+      httpGet:
+        path: "/"
+        port: 80
+      initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	expectedError, _ := regexp.Compile(".*at least one of `field` or `condition` must be provided in `wait_for` block.*")
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: expectedError,
+				//todo: improve checking
+			},
+		},
+	})
+}
+func TestAccKubectl_WaitForNegativeField(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test_wait_for" {
+  timeouts {
+    create = "10s"
+  }
+  yaml_body = <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-wait-for
+EOF
+
+  wait_for {
+    field {
+      key = "status.phase"
+      value = "Activez"
+    }
+  }
+}` //start := time.Now()
+	// atm the actual error is being hidden by the wait context being deleted. Fix this at some point
+	//errorRegex, _ := regexp.Compile(".*failed to wait for resource*")
+	errorRegex, _ := regexp.Compile(".*Wait returned an error*")
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: errorRegex,
+			},
+		},
+	})
+	log.Println(config)
+}
+
+func TestAccKubectl_WaitForNegativeCondition(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test" {
+	timeouts {
+		create = "20s"
+	}
+
+	wait_for {
+		condition {
+			type = "ContainersReady"
+			status = "Never"
+		}
+	}
+	yaml_body = <<YAML
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox-sleep
+spec:
+  containers:
+  - name: busybox
+    image: busybox
+    command: ["sleep", "30"]
+YAML
+}` //start := time.Now()
+	// atm the actual error is being hidden by the wait context being deleted. Fix this at some point
+	//errorRegex, _ := regexp.Compile(".*failed to wait for resource*")
+	errorRegex, _ := regexp.Compile(".*Wait returned an error*")
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: errorRegex,
+			},
+		},
+	})
+	log.Println(config)
+}
+
+func TestAccKubectl_WaitForNS(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test_wait_for" {
+  timeouts {
+    create = "200s"
+  }
+  yaml_body = <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test-wait-for
+EOF
+
+  wait_for {
+    field {
+      key = "status.phase"
+      value = "Active"
+    }
+  }
+}` //start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				//todo: improve checking
+			},
+		},
+	})
+	log.Println(config)
+}
+
+func TestAccKubectl_WaitForField(t *testing.T) {
 	//language=hcl
 	config := `
 resource "kubectl_manifest" "test" {
@@ -93,7 +582,7 @@ spec:
     readinessProbe:
       httpGet:
         path: "/"
-        port: 80			
+        port: 80
       initialDelaySeconds: 10
 YAML
 }
@@ -108,6 +597,295 @@ YAML
 			{
 				Config: config,
 				//todo: improve checking
+			},
+		},
+	})
+}
+
+func TestAccKubectl_WaitForConditions(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test" {
+	wait_for {
+		condition {
+			type = "ContainersReady"
+			status = "True"
+		}
+		condition {
+			type = "Ready"
+			status = "True"
+		}
+	}
+	yaml_body = <<YAML
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.14.2
+    readinessProbe:
+      httpGet:
+        path: "/"
+        port: 80
+      initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				//todo: improve checking
+			},
+		},
+	})
+}
+
+func TestAccKubectl_WaitForFieldAndCondition(t *testing.T) {
+	//language=hcl
+	config := `
+resource "kubectl_manifest" "test" {
+	wait_for {
+		condition {
+			type = "ContainersReady"
+			status = "True"
+		}
+		condition {
+			type = "Ready"
+			status = "True"
+		}
+		field {
+			key = "status.containerStatuses.[0].ready"
+			value = "true"
+		}
+		field {
+			key = "status.phase"
+			value = "Running"
+		}
+		field {
+			key = "status.podIP"
+			value = "^(\\d+(\\.|$)){4}"
+			value_type = "regex"
+		}
+	}
+	yaml_body = <<YAML
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.14.2
+    readinessProbe:
+      httpGet:
+        path: "/"
+        port: 80
+      initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				//todo: improve checking
+			},
+		},
+	})
+}
+
+func TestAccKubectl_WaitForConditionUpdate(t *testing.T) {
+	//language=hcl
+	createConfig := `
+resource "kubectl_manifest" "test" {
+	wait_for_rollout = true
+	yaml_body = <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27.0
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 80
+            initialDelaySeconds: 10
+YAML
+}
+`
+
+	updateConfig := `
+resource "kubectl_manifest" "test" {
+  wait_for_rollout = false
+	wait_for {
+		condition {
+			type = "Available"
+			status = "True"
+		}
+	}
+	yaml_body = <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27.2
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 80
+            initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: createConfig,
+			},
+			{
+				Config: updateConfig,
+			},
+		},
+	})
+}
+
+func TestAccKubectl_WaitForFieldUpdate(t *testing.T) {
+	//language=hcl
+	createConfig := `
+resource "kubectl_manifest" "test" {
+	wait_for_rollout = true
+	yaml_body = <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27.0
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 80
+            initialDelaySeconds: 10
+YAML
+}
+`
+
+	updateConfig := `
+resource "kubectl_manifest" "test" {
+  wait_for_rollout = false
+	wait_for {
+		field {
+			key = "status.observedGeneration"
+			value = "2"
+		}
+	}
+	yaml_body = <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27.2
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 80
+            initialDelaySeconds: 10
+YAML
+}
+`
+
+	//start := time.Now()
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckkubectlDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: createConfig,
+			},
+			{
+				Config: updateConfig,
 			},
 		},
 	})
@@ -143,7 +921,7 @@ YAML
 //}
 
 func TestAccInconsistentPlanning(t *testing.T) {
-	//See https://github.com/alekc/terraform-provider-kubectl/pull/46
+	//See https://github.com/froberg-co/terraform-provider-kubectl/pull/46
 	config := `
 resource "kubectl_manifest" "secret" {
   yaml_body = <<EOF
@@ -195,7 +973,7 @@ spec:
         backend:
           service:
             name: test
-            port: 
+            port:
               number: 80
 	EOT
 		}
@@ -222,7 +1000,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: mysecret
-  namespace: prod 
+  namespace: prod
 type: Opaque
 data:
 `
@@ -448,7 +1226,7 @@ spec:
         backend:
           service:
             name: test
-            port: 
+            port:
               number: 80`
 
 	config := fmt.Sprintf(`
@@ -504,7 +1282,7 @@ spec:
         backend:
           service:
             name: test
-            port: 
+            port:
               number: 80`
 
 	config := fmt.Sprintf(`
@@ -570,7 +1348,7 @@ spec:
         backend:
           service:
             name: test
-            port: 
+            port:
               number: 80`
 
 	config := fmt.Sprintf(`
@@ -1233,109 +2011,6 @@ status:
 `)
 
 	return manifest
-}
-
-// TestAccKubectl_WaitForeground exercises the explicit delete_cascade=Foreground
-// path on delete (the default when wait=true, but pinning it makes the
-// behaviour part of the test contract).
-func TestAccKubectl_WaitForeground(t *testing.T) {
-	//language=hcl
-	config := `
-resource "kubectl_manifest" "test" {
-	wait = true
-  delete_cascade = "Foreground"
-	yaml_body = <<YAML
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nginx-deployment
-  labels:
-    app: nginx
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: nginx
-  template:
-    metadata:
-      labels:
-        app: nginx
-    spec:
-      containers:
-        - name: nginx
-          image: nginx:1.14.2
-          ports:
-            - containerPort: 80
-          readinessProbe:
-            httpGet:
-              path: "/"
-              port: 80
-            initialDelaySeconds: 10
-YAML
-}
-`
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckkubectlDestroy,
-		Steps: []resource.TestStep{
-			{
-				Config: config,
-			},
-		},
-	})
-}
-
-// TestAccKubectl_WaitBackground exercises delete_cascade=Background even when
-// wait=true (overriding the wait-implied Foreground default).
-func TestAccKubectl_WaitBackground(t *testing.T) {
-	//language=hcl
-	config := `
-resource "kubectl_manifest" "test" {
-	wait = true
-  delete_cascade = "Background"
-	yaml_body = <<YAML
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nginx-deployment
-  labels:
-    app: nginx
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: nginx
-  template:
-    metadata:
-      labels:
-        app: nginx
-    spec:
-      containers:
-        - name: nginx
-          image: nginx:1.14.2
-          ports:
-            - containerPort: 80
-          readinessProbe:
-            httpGet:
-              path: "/"
-              port: 80
-            initialDelaySeconds: 10
-YAML
-}
-`
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckkubectlDestroy,
-		Steps: []resource.TestStep{
-			{
-				Config: config,
-			},
-		},
-	})
 }
 
 // TestAccKubectl_UpgradeApiVersion_InPlaceUpdate verifies that changing the

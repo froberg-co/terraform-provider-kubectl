@@ -37,7 +37,10 @@ YAML
 > Note: When the kind is a Deployment, this provider will wait for the deployment to be rolled out automatically for you!
 
 ### With explicit `wait_for`
-If `wait_for` is specified, upon applying the resource, provider will wait for **all** conditions to become true before proceeding further. 
+If `wait_for` is specified, upon applying the resource, the provider will wait for **all** declared `field` and `condition` entries to be satisfied before proceeding. At least one `field` or `condition` block must be present.
+
+#### Matching fields (gojsonq paths against the live object)
+
 
 ```hcl
 resource "kubectl_manifest" "test" {
@@ -74,6 +77,35 @@ YAML
 }
 ```
 
+#### Matching `status.conditions[]` entries
+
+```hcl
+resource "kubectl_manifest" "test" {
+  wait_for {
+    condition {
+      type   = "Ready"
+      status = "True"
+    }
+    condition {
+      type   = "ContainersReady"
+      status = "True"
+    }
+  }
+  yaml_body = <<YAML
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.14.2
+YAML
+}
+```
+
+`field` and `condition` blocks can be combined; the resource is considered ready only when **every** entry across both block types is satisfied.
+
 ## Argument Reference
 
 * `yaml_body` - Required. YAML to apply to kubernetes.
@@ -89,16 +121,17 @@ YAML
 * `validate_schema` - Optional. Setting to `false` will mimic `kubectl apply --validate=false` mode. Default `true`.
 * `wait` - Optional. Set this flag to wait or not for finalized to complete for deleted objects. Default `false`.
 * `delete_cascade` - Optional. Cascade mode for delete operations. One of `"Background"` or `"Foreground"`. When unset, defaults to `Background` unless `wait` is enabled, in which case it defaults to `Foreground`. Set this explicitly to match `kubectl`'s behaviour.
-* `wait_for_rollout` - Optional. Set this flag to wait or not for Deployments and APIService to complete rollout. Default `true`.
-* `wait_for`- Optional. If set, will wait until either all conditions are satisfied, or until timeout is reached (see [below for nested schema](#nestedblock--wait_for)). Under the hood [gojsonq](https://github.com/thedevsaddam/gojsonq) is used for querying, see the related syntax and examples
+* `wait_for_rollout` - Optional. When `true` (default), wait for the resource to finish rolling out before returning. Supported `kind`s are `Deployment`, `DaemonSet`, `StatefulSet`, and `APIService`.
+* `wait_for`- Optional. If set, will wait until **all** `field` and/or `condition` entries are satisfied, or until timeout is reached (see [below for nested schema](#nestedblock--wait_for)). Field queries use [gojsonq](https://github.com/thedevsaddam/gojsonq) syntax against the live object; condition entries are matched against `status.conditions[]`.
 
 ### Nested schemas
 <a id="nestedblock--wait_for"></a>
 ### Nested Schema for `wait_for`
 
-Required:
+At least one of the following must be provided:
 
-- `field` (Block List, Min: 1) Condition criteria for a field (see [below for nested schema](#nestedblock--wait_for--field))
+- `field` (Block List) Condition criteria for a field (see [below for nested schema](#nestedblock--wait_for--field))
+- `condition` (Block List) Status-condition criteria (see [below for nested schema](#nestedblock--wait_for--condition))
 
 <a id="nestedblock--wait_for--field"></a>
 ### Nested Schema for `wait_for.field`
@@ -111,6 +144,14 @@ Required:
 Optional:
 
 - `value_type` (String) Value type. Can be either a `eq` (equivalent) or `regex`
+
+<a id="nestedblock--wait_for--condition"></a>
+### Nested Schema for `wait_for.condition`
+
+Required:
+
+- `type` (String) Type as expected from the resulting Condition object (e.g. `Ready`, `Available`, `Progressing`).
+- `status` (String) Status to wait for in the resulting Condition object (typically `True`, `False`, or `Unknown`).
 
 ## Attribute Reference
 
@@ -214,8 +255,14 @@ More examples can be found in the provider tests.
 
 ## Waiting for Rollout
 
-By default, this resource will wait for Deployments and APIServices to complete their rollout before proceeding.
-You can disable this behavior by setting the `wait_for_rollout` field to `false`.
+By default, this resource will wait for the following kinds to complete their rollout before proceeding:
+
+- `Deployment` — wait until the desired number of replicas are updated and available.
+- `DaemonSet` — wait until all desired pods are scheduled and ready.
+- `StatefulSet` — wait until the rolling update completes and replicas match the spec.
+- `APIService` — wait until the service is reported as available.
+
+You can disable this behaviour by setting `wait_for_rollout = false` on the resource.
 
 ## Import
 
