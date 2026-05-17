@@ -9,9 +9,18 @@ on:
       - "scripts/**"
       - "*.md"
       - ".github/**"
+      - ".goreleaser.yml"
     branches:
       - master
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - ".run/**"
+      - "templates/**"
+      - "scripts/**"
+      - "*.md"
+      - ".github/**"
+      - ".goreleaser.yml"
     branches:
       - master
 
