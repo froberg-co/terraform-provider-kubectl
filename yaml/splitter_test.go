@@ -65,6 +65,41 @@ func TestYAMLDocumentHelper(t *testing.T) {
 	}
 }
 
+func TestYAMLDocumentHelper_DoesNotSplitOnSeparatorInsideBlockScalar(t *testing.T) {
+	// Regression: the previous bytes.Split-based splitter would cut
+	// inside the block scalar at the literal "---" line, producing
+	// two malformed documents. The k8s.io/apimachinery splitter is
+	// YAML-aware and must keep this as a single document.
+	input := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: name-here
+data:
+  notes: |
+    line one
+    ---
+    line three
+`
+	result, err := SplitMultiDocumentYAML(input)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(result), "block-scalar ``---`` must not be treated as a doc separator")
+	assert.Contains(t, result[0], "line one")
+	assert.Contains(t, result[0], "line three")
+}
+
+func TestYAMLDocumentHelper_DoesNotSplitOnSeparatorInsideQuotedString(t *testing.T) {
+	input := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: name-here
+data:
+  marker: "before ---\nafter"
+`
+	result, err := SplitMultiDocumentYAML(input)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(result), "quoted-string ``---`` must not be treated as a doc separator")
+}
+
 func TestYAMLDocumentHelperReadLargeFile(t *testing.T) {
 	testCases := []struct {
 		description  string

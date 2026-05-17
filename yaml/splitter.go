@@ -3,84 +3,52 @@ package yaml
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
-	yamlParser "gopkg.in/yaml.v2"
+	"io"
 	"strings"
+
+	yamlParser "gopkg.in/yaml.v2"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 )
 
+// SplitMultiDocumentYAML splits a multi-document YAML string into its
+// constituent documents. Empty documents (whitespace-only or
+// comments-only) are skipped. Each returned document is the document
+// body with surrounding whitespace trimmed.
+//
+// The splitter is YAML-aware (delegating to
+// k8s.io/apimachinery/pkg/util/yaml.NewYAMLReader), so document
+// separators (`---`) appearing inside quoted strings or block scalars
+// do NOT cause false splits.
 func SplitMultiDocumentYAML(multidoc string) (documents []string, err error) {
-	content := []byte(multidoc)
-
-	contentSplit := bytes.Split(content, []byte(yamlSeparator))
-
-	//set the maxCapacity using the size of the largest element
-	var maxCapacity = bufio.MaxScanTokenSize
-	for _, element := range contentSplit {
-		if len(element) >= maxCapacity {
-			maxCapacity = len(element) + 100
+	reader := utilyaml.NewYAMLReader(bufio.NewReader(bytes.NewReader([]byte(multidoc))))
+	for {
+		raw, readErr := reader.Read()
+		if errors.Is(readErr, io.EOF) {
+			break
 		}
-	}
+		if readErr != nil {
+			return documents, fmt.Errorf("error reading multi-document YAML: %w", readErr)
+		}
 
-	scanner := bufio.NewScanner(bytes.NewReader(content))
+		document := strings.TrimSpace(string(raw))
+		if document == "" {
+			continue
+		}
 
-	//increase the buffer token size if file is over the default token size
-	if maxCapacity > bufio.MaxScanTokenSize {
-		buf := make([]byte, maxCapacity)
-		scanner.Buffer(buf, maxCapacity)
-	}
-
-	scanner.Split(splitYAMLDocument)
-
-	for scanner.Scan() {
-		document := strings.TrimSpace(scanner.Text())
-
-		// attempt to parse the document as yaml
+		// Parse the document so the caller never receives an
+		// uncompilable document, and so we can skip
+		// comment-only/whitespace-only docs that survived TrimSpace.
 		rawYamlParsed := &map[string]interface{}{}
-		err := yamlParser.Unmarshal([]byte(document), rawYamlParsed)
-		if err != nil {
-			return documents, fmt.Errorf("Error parsing yaml document: %v\n%v", err, document)
+		if err := yamlParser.Unmarshal([]byte(document), rawYamlParsed); err != nil {
+			return documents, fmt.Errorf("error parsing yaml document: %v\n%v", err, document)
 		}
-
-		// skip empty yaml documents
 		if len(*rawYamlParsed) == 0 {
 			continue
 		}
 
-		// save to our collection of docs
 		documents = append(documents, document)
 	}
-
 	return documents, nil
-}
-
-const yamlSeparator = "\n---"
-
-// splitYAMLDocument is a bufio.SplitFunc for splitting YAML streams into individual documents.
-func splitYAMLDocument(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	if atEOF && len(data) == 0 {
-		return 0, nil, nil
-	}
-	sep := len([]byte(yamlSeparator))
-	if i := bytes.Index(data, []byte(yamlSeparator)); i >= 0 {
-		// We have a potential document terminator
-		i += sep
-		after := data[i:]
-		if len(after) == 0 {
-			// we can't read any more characters
-			if atEOF {
-				return len(data), data[:len(data)-sep], nil
-			}
-			return 0, nil, nil
-		}
-		if j := bytes.IndexByte(after, '\n'); j >= 0 {
-			return i + j + 1, data[0 : i-sep], nil
-		}
-		return 0, nil, nil
-	}
-	// If we're at EOF, we have a final, non-terminated line. Return it.
-	if atEOF {
-		return len(data), data, nil
-	}
-	// Request more data.
-	return 0, nil, nil
 }
