@@ -224,7 +224,7 @@ func (p *KubeProvider) ToRESTMapper() (meta.RESTMapper, error) {
 	if discoveryClient != nil {
 		mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 		expander := restmapper.NewShortcutExpander(mapper, discoveryClient, func(a string) {
-			log.Printf("[WARN] error in expander: %s", a)
+			log.Printf("[WARN] kubectl RESTMapper shortcut warning: %s", a)
 		})
 		return expander, nil
 	}

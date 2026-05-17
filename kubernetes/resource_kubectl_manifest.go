@@ -755,6 +755,20 @@ func resourceKubectlManifestReadUsingClient(ctx context.Context, d *schema.Resou
 	return nil
 }
 
+// resolveDeletePropagationPolicy picks the DeletionPropagation that will be
+// sent to the API server. The explicit `delete_cascade` value wins; otherwise
+// the policy mirrors kubectl's default (Background) but flips to Foreground
+// when the caller asked us to wait for delete to complete.
+func resolveDeletePropagationPolicy(cascade string, wait bool) meta_v1.DeletionPropagation {
+	if cascade != "" {
+		return meta_v1.DeletionPropagation(cascade)
+	}
+	if wait {
+		return meta_v1.DeletePropagationForeground
+	}
+	return meta_v1.DeletePropagationBackground
+}
+
 func resourceKubectlManifestDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) error {
 	if d.Get("apply_only").(bool) {
 		return nil
@@ -779,14 +793,7 @@ func resourceKubectlManifestDelete(ctx context.Context, d *schema.ResourceData, 
 	log.Printf("[INFO] %s perform delete of manifest", manifest)
 
 	waitForDelete := d.Get("wait").(bool)
-	var propagationPolicy meta_v1.DeletionPropagation
-	if cascade := d.Get("delete_cascade").(string); cascade != "" {
-		propagationPolicy = meta_v1.DeletionPropagation(cascade)
-	} else if waitForDelete {
-		propagationPolicy = meta_v1.DeletePropagationForeground
-	} else {
-		propagationPolicy = meta_v1.DeletePropagationBackground
-	}
+	propagationPolicy := resolveDeletePropagationPolicy(d.Get("delete_cascade").(string), waitForDelete)
 	err = restClient.ResourceInterface.Delete(ctx, manifest.GetName(), meta_v1.DeleteOptions{PropagationPolicy: &propagationPolicy})
 	resourceGone := errors.IsGone(err) || errors.IsNotFound(err)
 	if err != nil && !resourceGone {

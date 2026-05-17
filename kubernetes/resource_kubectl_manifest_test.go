@@ -12,8 +12,31 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/stretchr/testify/assert"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+func TestResolveDeletePropagationPolicy(t *testing.T) {
+	cases := []struct {
+		name    string
+		cascade string
+		wait    bool
+		want    meta_v1.DeletionPropagation
+	}{
+		{"explicit Foreground overrides wait=false", "Foreground", false, meta_v1.DeletePropagationForeground},
+		{"explicit Background overrides wait=true", "Background", true, meta_v1.DeletePropagationBackground},
+		{"explicit Foreground with wait=true", "Foreground", true, meta_v1.DeletePropagationForeground},
+		{"explicit Background with wait=false", "Background", false, meta_v1.DeletePropagationBackground},
+		{"default with wait=true is Foreground", "", true, meta_v1.DeletePropagationForeground},
+		{"default with wait=false is Background", "", false, meta_v1.DeletePropagationBackground},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolveDeletePropagationPolicy(tc.cascade, tc.wait)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
 
 func TestKubectlManifest_RetryOnFailure(t *testing.T) {
 	_ = os.Setenv("KUBECTL_PROVIDER_APPLY_RETRY_COUNT", "5")
