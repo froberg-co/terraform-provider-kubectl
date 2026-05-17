@@ -1,14 +1,10 @@
 # Kubectl Provider
 
-This provider is the best way of managing Kubernetes resources in Terraform, by allowing you to use the thing
-Kubernetes loves best - yaml!
+Manage Kubernetes resources from Terraform using their native YAML.
 
-This core of this provider is the `kubectl_manifest` resource, allowing free-form yaml to be processed and applied against Kubernetes.
-This yaml object is then tracked and handles creation, updates and deleted seamlessly - including drift detection!
+The core resource — `kubectl_manifest` — takes a free-form YAML manifest, applies it against the API server, and tracks its full lifecycle (create, update, delete, drift detection) just like `kubectl apply`. A small set of data sources (`kubectl_filename_list`, `kubectl_file_documents`, `kubectl_path_documents`, `kubectl_server_version`) help loading and templating manifests from disk.
 
-A set of helpful data resources to process directories of yaml files and inline templating is available.
-
-This `terraform-provider-kubectl` provider has been originally forked from `gavinbunney/kubectl` and followed a separate development path from the version 0.14
+This provider was originally forked from `gavinbunney/kubectl` and has followed a separate development path since v0.14.
 
 ## Installation
 
@@ -36,10 +32,9 @@ then either place it at the root of your Terraform folder or in the Terraform pl
 
 ## Configuration
 
-The provider supports the same configuration parameters as the [Kubernetes Terraform Provider](https://www.terraform.io/docs/providers/kubernetes/index.html),
-with the addition of `load_config_file` and `apply_retry_count`.
+The provider supports the same configuration parameters as the [Kubernetes Terraform Provider](https://www.terraform.io/docs/providers/kubernetes/index.html), plus `load_config_file` and `apply_retry_count`.
 
-> Note: Unlike the Terraform Kubernetes Provider, this provider will load the `KUBECONFIG` file if the environment variable is set.
+> Note: unlike the upstream Kubernetes Terraform Provider, this provider honours the `KUBECONFIG` environment variable when set.
 
 ```hcl
 provider "kubectl" {
@@ -71,7 +66,7 @@ The following arguments are supported:
 * `token` - (Optional) Token of your service account.  Can be sourced from `KUBE_TOKEN`.
 * `proxy_url` - (Optional) URL to the proxy to be used for all API requests. URLs with "http", "https", and "socks5" schemes are supported. Can be sourced from `KUBE_PROXY_URL`.
 * `tls_server_name` - (Optional) Server name passed to the server for SNI and is used in the client to check server certificates against.
-* `exec` - (Optional) Configuration block to use an [exec-based credential plugin] (https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins), e.g. call an external command to receive user credentials.
+* `exec` - (Optional) Configuration block to use an [exec-based credential plugin](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins) — e.g. an external command that produces user credentials.
     * `api_version` - (Required) API version to use when decoding the ExecCredentials resource, e.g. `client.authentication.k8s.io/v1beta1`.
     * `command` - (Required) Command to execute.
     * `args` - (Optional) List of arguments to pass when executing the plugin.
@@ -79,7 +74,7 @@ The following arguments are supported:
 
 ### Exec Plugin Support
 
-As with the Kubernetes Terraform Provider, this provider also supports using a `exec` based plugin (for example when running on EKS).
+This provider supports `exec`-based credential plugins (e.g. for EKS):
 
 ```hcl
 provider "kubectl" {
@@ -102,9 +97,7 @@ provider "kubectl" {
 
 ### Retry Support
 
-The provider has an additional parameter `apply_retry_count` that allows kubernetes commands to be retried on failure.
-This is useful if you have flaky CRDs or network connections and need to wait for the cluster state to be back in quorum.
-This applies to both create and update operations.
+`apply_retry_count` lets the provider retry transient failures on create and update — useful when CRDs are still being installed or the cluster state needs to settle.
 
 ```hcl
 provider "kubectl" {
@@ -114,7 +107,7 @@ provider "kubectl" {
 
 ## Example
 
-Loading a raw yaml manifest into kubernetes is simple, just set the `yaml_body` argument:
+Load a raw YAML manifest by setting `yaml_body`:
 
 ```hcl
 provider "kubectl" {
@@ -153,4 +146,4 @@ YAML
 }
 ```
 
-Updates are also preserved, so you can fully manage your kubernetes resources with ease!
+Updates and drift detection are tracked automatically — you manage Kubernetes objects as full Terraform resources.

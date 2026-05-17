@@ -1,8 +1,6 @@
 # Resource: kubectl_server_version
 
-This provider provides a resource `kubectl_server_version` to enable looking up of a kubernetes server version information.
-This is exactly the same as the `data` source `kubectl_server_version` but allows you to better chain dependencies, such that data sources are notoriously tricky for use `depends_on` with!
-This is particularily helpful if you need to match specific components with the kubernetes server version, e.g. `kube-proxy`.
+Same as the [`kubectl_server_version` data source](../data-sources/kubectl_server_version.md), but exposed as a resource so it composes cleanly with `depends_on` and lifecycle hooks. Useful for pinning component versions (e.g. `kube-proxy`) to the cluster's exact server version.
 
 ## Example Usage
 
@@ -12,7 +10,7 @@ resource "kubectl_server_version" "current" { }
 
 ## Argument Reference
   
-* `triggers` - Optional. Any changes in triggers will force a re-read. Behaves the same as the `null_resource` triggers. 
+* `triggers` - Optional. Map; any change forces a re-read of the server version. Same semantics as `null_resource.triggers`.
 
 ## Attribute Reference
 

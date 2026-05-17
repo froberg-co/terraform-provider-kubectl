@@ -1,18 +1,12 @@
 # Data Source: kubectl_path_documents
 
-This provider provides a `data` resource `kubectl_path_documents` to enable ease of splitting multi-document yaml content, 
-from a collection of matching files.
-Think of is as a combination of both `kubectl_filename_list` and `kubectl_file_documents`
-
-`kubectl_path_documents` also supports rendering of Terraform Templates (similar to the template provider).
-This gives you the flexibility of parameterizing your manifests, and loading & templating in a single command.
+Loads every file matching a glob, splits each one into individual YAML documents, and (optionally) renders Terraform-style templating against the documents. Equivalent to `kubectl_filename_list` + `kubectl_file_documents` in a single step.
 
 ## Example Usage
 
-### Load all manifest documents from a folder via for_each (recommended)
+### With for_each (recommended)
 
-The recommended approach is to use the `manifests` attribute and a `for_each` expression to apply the found manifests.
-This ensures that any additional yaml documents or removals do not cause a large amount of terraform changes.
+Use `manifests` with `for_each` so adding or removing a document doesn't churn unrelated resources.
 
 ```hcl
 data "kubectl_path_documents" "manifests-directory-yaml" {
@@ -24,10 +18,11 @@ resource "kubectl_manifest" "directory-yaml" {
 }
 ```
 
-### Load all manifest documents via count
+### With count
 
-Raw documents can also be accessed via the `documents` attribute. Not that if the document order is changed (i.e. a new file is added), 
-then it would trigger destruction and recreation of related documents. 
+`documents` exposes the raw list, indexable by position.
+
+> Caveat: reordering or inserting a document mid-list causes Terraform to destroy and recreate everything that shifts index — prefer `for_each` unless ordering is stable.
 
 ```hcl
 data "kubectl_path_documents" "docs" {
@@ -40,78 +35,69 @@ resource "kubectl_manifest" "test" {
 }
 ```
 
-### Example Template
+### Templating
 
-```hcl
-#
-# Given the following YAML template
-#
+`vars` is substituted into each document before YAML parsing. Manifest:
+
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
   name: nginx
-  labels:
-    name: nginx
 spec:
   containers:
-  - name: nginx
-    image: ${docker_image}
-    ports:
-    - containerPort: 80
+    - name: nginx
+      image: ${docker_image}
+      ports:
+        - containerPort: 80
+```
 
+Terraform:
 
-#
-# Load the yaml file, parsing the ${docker_image} variable
-#
+```hcl
 data "kubectl_path_documents" "manifests" {
-    pattern = "./manifests/*.yaml"
-    vars = {
-        docker_image = "https://myregistry.example.com/nginx"
-    }
+  pattern = "./manifests/*.yaml"
+  vars = {
+    docker_image = "https://myregistry.example.com/nginx"
+  }
 }
 ```
 
-### Example Template with Directives
+### Templating with directives
 
-Templates even support directives, meaning you can add conditions and another logic to your template:
+Templates support full Terraform template directives (`%{ if }`, `%{ for }`, etc.) for conditionals and loops:
 
-```hcl
-#
-# Given the following YAML template
-#
+Conditional example — defaults `image` when `docker_image` is empty:
+
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
   name: nginx
-  labels:
-    name: nginx
 spec:
   containers:
-  - name: nginx
-    image: %{ if docker_image != "" }${docker_image}%{ else }default-nginx%{ endif }
-    ports:
-    - containerPort: 80
+    - name: nginx
+      image: %{ if docker_image != "" }${docker_image}%{ else }default-nginx%{ endif }
+      ports:
+        - containerPort: 80
+```
 
-
-#
-# Load the yaml file, parsing the ${docker_registry} variable, resulting in `default-nginx`
-#
+```hcl
 data "kubectl_path_documents" "manifests" {
-    pattern = "./manifests/*.yaml"
-    vars = {
-        docker_image = ""
-    }
+  pattern = "./manifests/*.yaml"
+  vars = {
+    docker_image = ""
+  }
 }
 ```
 
-### Example Template with Looping Directive
+### Templating with loops
 
-Using a directive to generate multiple manifests is possible with using a combination of split and directive within the template:
+A `%{ for }` directive plus YAML's `---` separator can produce one document per item — useful for fanning a manifest across namespaces:
 
-```hcl
-#
-# Given the following YAML template
-#
+Template:
+
+```yaml
 %{ for namespace in split(",", namespaces) }
 ---
 kind: PersistentVolumeClaim
@@ -127,48 +113,27 @@ spec:
     requests:
       storage: 100Gi
 %{ endfor }
-
-#
-# Loading the document is a comma-separated list of namespace
-#
-data "kubectl_path_documents" "manifests" {
-    pattern = "./manifests/*.yaml"
-    vars = {
-        namespaces = "dev,test,prod"
-    }
-}
-
-#
-# Results in 3 documents:
-#
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: myvolume-claim
-  namespace: dev
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: myvolume-claim
-  namespace: test
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: myvolume-claim
-  namespace: prod
 ```
+
+```hcl
+data "kubectl_path_documents" "manifests" {
+  pattern = "./manifests/*.yaml"
+  vars = {
+    namespaces = "dev,test,prod"
+  }
+}
+```
+
+With `namespaces = "dev,test,prod"` this produces three PVC documents, one per namespace.
 
 ## Argument Reference
 
-* `pattern` - Required. Glob pattern to search for.
-* `vars` - Optional. Map of variables to use when rendering the loaded documents as templates. Currently only strings are supported.
-* `sensitive_vars` - Optional. Map of sensitive variables to use when rendering the loaded documents as templates. Merged with the `vars` attribute. Currently only strings are supported.
-* `disable_template` - Optional. Flag to disable template parsing of the loaded documents.
+* `pattern` - Required. Glob to match files on disk.
+* `vars` - Optional. String→string map substituted into each document before YAML parsing.
+* `sensitive_vars` - Optional. Same as `vars` but values are marked sensitive in plan output. Merged with `vars`.
+* `disable_template` - Optional. When `true`, skip template parsing entirely and load documents verbatim.
 
 ## Attribute Reference
 
-* `manifests` - Map of YAML documents with key being the document id, and value being the document yaml. Best used with `for_each` expressions.
-* `documents` - List of YAML documents (list[string]). Best used with `count` expressions.
+* `manifests` - Map keyed by a stable document ID, valued by the document YAML. Best paired with `for_each`.
+* `documents` - List of YAML documents. Best paired with `count` (see caveat above).
