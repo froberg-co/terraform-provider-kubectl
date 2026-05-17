@@ -1,6 +1,6 @@
 # Kubernetes "kubectl" Provider 
 
-![Build Status](https://github.com/froberg-co/terraform-provider-kubectl/actions/workflows/tests.yml/badge.svg) [![user guide](https://img.shields.io/badge/-user%20guide-blue)](https://registry.terraform.io/providers/froberg-co/kubectl)
+![Build Status](https://github.com/froberg-co/terraform-provider-kubectl/actions/workflows/tests.yaml/badge.svg) [![user guide](https://img.shields.io/badge/-user%20guide-blue)](https://registry.terraform.io/providers/froberg-co/kubectl)
 
 This provider offers the most effective method for handling Kubernetes resources in Terraform. It empowers you to leverage what Kubernetes values most - YAML!
 
@@ -9,8 +9,10 @@ At the heart of this provider lies the kubectl_manifest resource, enabling the p
 The terraform-provider-kubectl has gained widespread adoption in numerous extensive Kubernetes installations, serving as the primary tool for orchestrating the complete lifecycle of Kubernetes resources.
 
 ## Supported Kubernetes and Terraform versions
-At the moment, the acceptance tests cover a combination of the last 7 Kubernetes releases and the last 4 stable 
-Terraform versions (plus 0.15). This doesn't necessarily mean it won't work with other combinations, but your mileage may vary
+
+Acceptance tests run against the five most recent `kindest/node` image tags published with the currently-pinned `helm/kind-action` release (today: kind v0.31.0 → Kubernetes 1.31.14, 1.32.11, 1.33.7, 1.34.3, 1.35.0). Older or newer Kubernetes versions may still work, but are not exercised in CI.
+
+Terraform is tested against v1.5.7 in the matrix; the provider builds against the v2 plugin SDK, so any Terraform ≥ 0.13 that supports v2 plugins should function.
 
 ## Installation
 
