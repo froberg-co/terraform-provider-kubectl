@@ -21,6 +21,12 @@
 
 - [Single-node CockroachDB StatefulSet](./cockroachdb/single_node.tf) — insecure-mode standalone instance backed by `emptyDir`; swap for a PVC + TLS in production.
 
+## Patterns documented elsewhere
+
+Some examples live outside `_examples/` because they require cluster-side prerequisites that the acceptance-test walker can't satisfy (custom CRDs, operators, etc.):
+
+- [Install the CockroachDB operator via an ArgoCD ApplicationSet](../docs/guides/argocd-cockroachdb-operator.md) — declares an ArgoCD `ApplicationSet` that installs `cockroach-operator` from Helm.
+
 ## CRDs
 
 - [Apply a Couchbase CRD instance](./crds/couchbase.tf)
