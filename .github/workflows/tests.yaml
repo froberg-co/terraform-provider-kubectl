@@ -47,7 +47,7 @@ jobs:
     needs: get_version_matrix
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         terraform_version:  ${{ fromJson(needs.get_version_matrix.outputs.terraform_versions) }}
         k8s_version:  ${{ fromJson(needs.get_version_matrix.outputs.k8s_versions) }}
@@ -57,15 +57,51 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: helm/kind-action@v1.10.0
+      - uses: helm/kind-action@v1.14.0
         id: kind
         with:
-          wait: 2m
+          wait: 5m
           node_image: kindest/node:v${{ matrix.k8s_version }}
+          kubeconfig: ${{ env.KUBECONFIG }}
+      - name: Diagnose cluster
+        run: |
+          set +e
+          esc() {
+            local s=$1
+            s=${s//'%'/'%25'}
+            s=${s//$'\r'/'%0D'}
+            s=${s//$'\n'/'%0A'}
+            printf '%s' "$s"
+          }
+          KCF_EXISTS=$(test -f "$KUBECONFIG" && echo yes || echo no)
+          KCF_SIZE=$(stat -c%s "$KUBECONFIG" 2>/dev/null || echo 0)
+          CINFO=$(kubectl --kubeconfig "$KUBECONFIG" cluster-info 2>&1 | head -1 | tr -d '\n')
+          NODES_OK=$(kubectl --kubeconfig "$KUBECONFIG" get nodes --no-headers 2>&1 | wc -l)
+          KVERSION=$(kubectl --kubeconfig "$KUBECONFIG" version --client=true 2>&1 | head -1 | tr -d '\n')
+          echo "::notice title=Cluster diagnosis::KUBECONFIG=$(esc "$KUBECONFIG") exists=$KCF_EXISTS size=$KCF_SIZE nodes_count=$NODES_OK"
+          echo "::notice title=cluster-info::$(esc "$CINFO")"
+          echo "::notice title=kubectl version::$(esc "$KVERSION")"
       - name: Acceptance Tests
         env:
           KUBE_CONFIG_PATH: ${{ env.KUBECONFIG }}
           TF_ACC_TERRAFORM_VERSION: ${{ matrix.terraform_version }}
           TESTARGS: "-parallel 1"
         run: |
-          make testacc
+          set +e
+          esc() {
+            local s=$1
+            s=${s//'%'/'%25'}
+            s=${s//$'\r'/'%0D'}
+            s=${s//$'\n'/'%0A'}
+            printf '%s' "$s"
+          }
+          LOG=$(mktemp)
+          # Stream to the job log AND tee to a file for annotation extraction,
+          # so failures show up live and large outputs don't sit in a shell var.
+          make testacc 2>&1 | tee "$LOG"
+          EXIT=${PIPESTATUS[0]}
+          FIRST_FAIL=$(grep -E "^(FAIL|--- FAIL|panic:|Error:|cannot run)" "$LOG" | head -1 | tr -d '\n')
+          TAIL=$(tail -20 "$LOG")
+          echo "::notice title=testacc first-fail::$(esc "$FIRST_FAIL")"
+          echo "::notice title=testacc tail::$(esc "$TAIL")"
+          exit "$EXIT"
