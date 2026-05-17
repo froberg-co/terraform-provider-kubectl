@@ -286,6 +286,12 @@ metadata:
 			_ = d.SetNew("namespace", parsedYaml.GetNamespace())
 			_ = d.SetNew("name", parsedYaml.GetName())
 
+			// Force recreation when api_version changes unless the user has
+			// opted into in-place api_version upgrades.
+			if !d.Get("upgrade_api_version").(bool) && d.HasChange("api_version") {
+				_ = d.ForceNew("api_version")
+			}
+
 			// set the yaml_body_parsed field to provided value and obfuscate the yaml_body values manually
 			// this allows us to show a nice diff to the users with specific fields obfuscated, whilst storing the
 			// real value to apply in yaml_body
@@ -399,7 +405,9 @@ var (
 		"api_version": {
 			Type:     schema.TypeString,
 			Computed: true,
-			ForceNew: true,
+			// ForceNew is applied conditionally in CustomizeDiff so the
+			// `upgrade_api_version` option can allow in-place updates when
+			// only the api_version changes.
 		},
 		"kind": {
 			Type:     schema.TypeString,
@@ -440,6 +448,12 @@ var (
 		"force_new": {
 			Type:        schema.TypeBool,
 			Description: "Default to update in-place. Setting to true will delete and create the kubernetes instead.",
+			Optional:    true,
+			Default:     false,
+		},
+		"upgrade_api_version": {
+			Type:        schema.TypeBool,
+			Description: "When true, changing the api_version in yaml_body will update the resource in-place rather than forcing a delete and recreate. This leverages Kubernetes' ability to represent the same object across multiple API versions.",
 			Optional:    true,
 			Default:     false,
 		},
@@ -526,6 +540,12 @@ var (
 					},
 				},
 			},
+		},
+		"delete_cascade": {
+			Type:             schema.TypeString,
+			Description:      "Cascade mode for delete operations. Set to Background to match kubectl's default. When unset, defaults to Background unless wait is enabled, in which case it defaults to Foreground.",
+			Optional:         true,
+			ValidateDiagFunc: validate2.ToDiagFunc(validate2.StringInSlice([]string{string(meta_v1.DeletePropagationBackground), string(meta_v1.DeletePropagationForeground)}, false)),
 		},
 	}
 )
@@ -759,10 +779,14 @@ func resourceKubectlManifestDelete(ctx context.Context, d *schema.ResourceData, 
 
 	log.Printf("[INFO] %s perform delete of manifest", manifest)
 
-	propagationPolicy := meta_v1.DeletePropagationBackground
 	waitForDelete := d.Get("wait").(bool)
-	if waitForDelete {
+	var propagationPolicy meta_v1.DeletionPropagation
+	if cascade := d.Get("delete_cascade").(string); cascade != "" {
+		propagationPolicy = meta_v1.DeletionPropagation(cascade)
+	} else if waitForDelete {
 		propagationPolicy = meta_v1.DeletePropagationForeground
+	} else {
+		propagationPolicy = meta_v1.DeletePropagationBackground
 	}
 	err = restClient.ResourceInterface.Delete(ctx, manifest.GetName(), meta_v1.DeleteOptions{PropagationPolicy: &propagationPolicy})
 	resourceGone := errors.IsGone(err) || errors.IsNotFound(err)
