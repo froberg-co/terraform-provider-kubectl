@@ -41,7 +41,6 @@ import (
 	apps_v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	meta_v1_unstruct "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8sschema "k8s.io/apimachinery/pkg/runtime/schema"
 	yamlWriter "sigs.k8s.io/yaml"
@@ -400,6 +399,7 @@ var (
 			Type:        schema.TypeString,
 			Description: "Yaml body that is being applied, with sensitive values obfuscated",
 			Computed:    true,
+			Sensitive:   true,
 		},
 		"sensitive_fields": {
 			Type:        schema.TypeList,
@@ -659,7 +659,7 @@ func resourceKubectlManifestApply(ctx context.Context, d *schema.ResourceData, m
 				return err
 			}
 		case manifest.GetKind() == "StatefulSet":
-			log.Printf("[INFO] %v waiting for v rollout for %vmin", manifest, timeout.Minutes())
+			log.Printf("[INFO] %v waiting for StatefulSet rollout for %vmin", manifest, timeout.Minutes())
 			err = waitForStatefulSetRollout(ctx, meta.(*KubeProvider), manifest.GetNamespace(), manifest.GetName(), timeout)
 			if err != nil {
 				return err
@@ -973,7 +973,7 @@ func waitForDelete(ctx context.Context, restClient *RestClientResult, name strin
 	}
 
 	if !resourceGone {
-		resourceVersion, _, err := unstructured.NestedString(rawResponse.Object, "metadata", "resourceVersion")
+		resourceVersion, _, err := meta_v1_unstruct.NestedString(rawResponse.Object, "metadata", "resourceVersion")
 		if err != nil {
 			return err
 		}
@@ -995,7 +995,20 @@ func waitForDelete(ctx context.Context, restClient *RestClientResult, name strin
 		deleted := false
 		for !deleted {
 			select {
-			case event := <-watcher.ResultChan():
+			case event, ok := <-watcher.ResultChan():
+				if !ok {
+					// Watcher closed (timeout, RV-too-old, etc.). Re-check the
+					// resource in case it disappeared during the watch.
+					_, getErr := restClient.ResourceInterface.Get(ctx, name, meta_v1.GetOptions{})
+					if errors.IsGone(getErr) || errors.IsNotFound(getErr) {
+						deleted = true
+						break
+					}
+					return fmt.Errorf("%s watch closed before resource was deleted", name)
+				}
+				if event.Type == watch.Error {
+					return fmt.Errorf("%s watch error during delete: %v", name, event.Object)
+				}
 				if event.Type == watch.Deleted {
 					deleted = true
 				}
@@ -1024,8 +1037,14 @@ func waitForDeploymentRollout(ctx context.Context, provider *KubeProvider, ns st
 	done := false
 	for !done {
 		select {
-		case event := <-watcher.ResultChan():
-			if event.Type == watch.Modified {
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				return fmt.Errorf("%s watch closed before Deployment rollout completed", name)
+			}
+			if event.Type == watch.Error {
+				return fmt.Errorf("%s watch error during Deployment rollout: %v", name, event.Object)
+			}
+			if event.Type == watch.Modified || event.Type == watch.Added {
 				deployment, ok := event.Object.(*apps_v1.Deployment)
 				if !ok {
 					return fmt.Errorf("%s could not cast to Deployment", name)
@@ -1034,7 +1053,7 @@ func waitForDeploymentRollout(ctx context.Context, provider *KubeProvider, ns st
 				if deployment.Generation <= deployment.Status.ObservedGeneration {
 					condition := getDeploymentCondition(deployment.Status, apps_v1.DeploymentProgressing)
 					if condition != nil && condition.Reason == TimedOutReason {
-						continue
+						return fmt.Errorf("%s Deployment exceeded its progress deadline (Progressing=%s, reason=%s): %s", name, condition.Status, condition.Reason, condition.Message)
 					}
 
 					if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
@@ -1087,8 +1106,14 @@ func waitForDaemonSetRollout(ctx context.Context, provider *KubeProvider, ns str
 	done := false
 	for !done {
 		select {
-		case event := <-watcher.ResultChan():
-			if event.Type == watch.Modified {
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				return fmt.Errorf("%s watch closed before DaemonSet rollout completed", name)
+			}
+			if event.Type == watch.Error {
+				return fmt.Errorf("%s watch error during DaemonSet rollout: %v", name, event.Object)
+			}
+			if event.Type == watch.Modified || event.Type == watch.Added {
 				daemon, ok := event.Object.(*apps_v1.DaemonSet)
 				if !ok {
 					return fmt.Errorf("%s could not cast to DaemonSet", name)
@@ -1135,8 +1160,14 @@ func waitForStatefulSetRollout(ctx context.Context, provider *KubeProvider, ns s
 	done := false
 	for !done {
 		select {
-		case event := <-watcher.ResultChan():
-			if event.Type == watch.Modified {
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				return fmt.Errorf("%s watch closed before StatefulSet rollout completed", name)
+			}
+			if event.Type == watch.Error {
+				return fmt.Errorf("%s watch error during StatefulSet rollout: %v", name, event.Object)
+			}
+			if event.Type == watch.Modified || event.Type == watch.Added {
 				sts, ok := event.Object.(*apps_v1.StatefulSet)
 				if !ok {
 					return fmt.Errorf("%s could not cast to StatefulSet", name)
@@ -1194,17 +1225,24 @@ func waitForApiService(ctx context.Context, provider *KubeProvider, name string,
 	done := false
 	for !done {
 		select {
-		case event := <-watcher.ResultChan():
-			if event.Type == watch.Modified {
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				return fmt.Errorf("%s watch closed before APIService became available", name)
+			}
+			if event.Type == watch.Error {
+				return fmt.Errorf("%s watch error waiting for APIService: %v", name, event.Object)
+			}
+			if event.Type == watch.Modified || event.Type == watch.Added {
 				apiService, ok := event.Object.(*apiregistration.APIService)
 				if !ok {
 					return fmt.Errorf("%s could not cast to APIService", name)
 				}
 
 				for i := range apiService.Status.Conditions {
-					if apiService.Status.Conditions[i].Type == apiregistration.Available {
+					c := apiService.Status.Conditions[i]
+					if c.Type == apiregistration.Available && c.Status == apiregistration.ConditionTrue {
 						done = true
-						continue
+						break
 					}
 				}
 			}
@@ -1217,15 +1255,105 @@ func waitForApiService(ctx context.Context, provider *KubeProvider, name string,
 	return nil
 }
 
+// matchesWaitForCriteria evaluates the supplied field and condition
+// expectations against the live object. Returns true once every entry is
+// satisfied. Pulled out of waitForConditions so the initial Get can short-
+// circuit the watch when the resource is already in the desired state.
+func matchesWaitForCriteria(obj *meta_v1_unstruct.Unstructured, waitFields []types.WaitForField, waitConditions []types.WaitForStatusCondition, name string) (bool, error) {
+	totalConditions := len(waitConditions) + len(waitFields)
+	if totalConditions == 0 {
+		return true, nil
+	}
+
+	yamlJson, err := obj.MarshalJSON()
+	if err != nil {
+		return false, err
+	}
+
+	gq := gojsonq.New().FromString(string(yamlJson))
+	totalMatches := 0
+
+	for _, c := range waitConditions {
+		count := gq.Reset().From("status.conditions").
+			Where("type", "=", c.Type).
+			Where("status", "=", c.Status).Count()
+		if count == 0 {
+			log.Printf("[TRACE] Condition %s with status %s not found in %s", c.Type, c.Status, name)
+			continue
+		}
+		log.Printf("[TRACE] Condition %s with status %s found in %s", c.Type, c.Status, name)
+		totalMatches++
+	}
+
+	for _, c := range waitFields {
+		v := gq.Reset().Find(c.Key)
+		if v == nil {
+			log.Printf("[TRACE] Key %s not found in %s", c.Key, name)
+			continue
+		}
+
+		stringVal := fmt.Sprintf("%v", v)
+		switch c.ValueType {
+		case "regex":
+			matched, err := regexp.Match(c.Value, []byte(stringVal))
+			if err != nil {
+				return false, err
+			}
+			if !matched {
+				log.Printf("[TRACE] Value %s does not match regex %s in %s (key %s)", stringVal, c.Value, name, c.Key)
+				continue
+			}
+			log.Printf("[TRACE] Value %s matches regex %s in %s (key %s)", stringVal, c.Value, name, c.Key)
+			totalMatches++
+
+		case "eq", "":
+			if stringVal != c.Value {
+				log.Printf("[TRACE] Value %s does not match %s in %s (key %s)", stringVal, c.Value, name, c.Key)
+				continue
+			}
+			log.Printf("[TRACE] Value %s matches %s in %s (key %s)", stringVal, c.Value, name, c.Key)
+			totalMatches++
+		}
+	}
+
+	if totalMatches == totalConditions {
+		log.Printf("[TRACE] All conditions met for %s", name)
+		return true, nil
+	}
+	log.Printf("[TRACE] %d/%d conditions met for %s. Waiting for next", totalMatches, totalConditions, name)
+	return false, nil
+}
+
 func waitForConditions(ctx context.Context, restClient *RestClientResult, waitFields []types.WaitForField, waitConditions []types.WaitForStatusCondition, name string, timeout time.Duration) error {
 	timeoutSeconds := int64(timeout.Seconds())
+
+	// Check the current state first so we don't hang on a watch when the
+	// resource already satisfies the criteria and no further updates arrive.
+	initial, err := restClient.ResourceInterface.Get(ctx, name, meta_v1.GetOptions{})
+	if err == nil {
+		matched, mErr := matchesWaitForCriteria(initial, waitFields, waitConditions, name)
+		if mErr != nil {
+			return mErr
+		}
+		if matched {
+			return nil
+		}
+	} else if !errors.IsNotFound(err) {
+		return err
+	}
+
+	startRV := ""
+	if initial != nil {
+		startRV = initial.GetResourceVersion()
+	}
 
 	watcher, err := restClient.ResourceInterface.Watch(
 		ctx,
 		meta_v1.ListOptions{
-			Watch:          true,
-			TimeoutSeconds: &timeoutSeconds,
-			FieldSelector:  fields.OneTermEqualSelector("metadata.name", name).String(),
+			Watch:           true,
+			TimeoutSeconds:  &timeoutSeconds,
+			FieldSelector:   fields.OneTermEqualSelector("metadata.name", name).String(),
+			ResourceVersion: startRV,
 		},
 	)
 	if err != nil {
@@ -1233,88 +1361,35 @@ func waitForConditions(ctx context.Context, restClient *RestClientResult, waitFi
 	}
 	defer watcher.Stop()
 
-	done := false
-	for !done {
+	for {
 		select {
-		case event := <-watcher.ResultChan():
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				return fmt.Errorf("%s watch closed before wait_for criteria were satisfied", name)
+			}
 			log.Printf("[TRACE] Received event type %s for %s", event.Type, name)
-			if event.Type == watch.Modified || event.Type == watch.Added {
-				rawResponse, ok := event.Object.(*meta_v1_unstruct.Unstructured)
-				if !ok {
-					return fmt.Errorf("%s could not cast resource to unstructured", name)
-				}
-
-				totalConditions := len(waitConditions) + len(waitFields)
-				totalMatches := 0
-
-				yamlJson, err := rawResponse.MarshalJSON()
-				if err != nil {
-					return err
-				}
-
-				gq := gojsonq.New().FromString(string(yamlJson))
-
-				for _, c := range waitConditions {
-					// Find the conditions by status and type
-					count := gq.Reset().From("status.conditions").
-						Where("type", "=", c.Type).
-						Where("status", "=", c.Status).Count()
-					if count == 0 {
-						log.Printf("[TRACE] Condition %s with status %s not found in %s", c.Type, c.Status, name)
-						continue
-					}
-					log.Printf("[TRACE] Condition %s with status %s found in %s", c.Type, c.Status, name)
-					totalMatches++
-				}
-
-				for _, c := range waitFields {
-					// Find the key
-					v := gq.Reset().Find(c.Key)
-					if v == nil {
-						log.Printf("[TRACE] Key %s not found in %s", c.Key, name)
-						continue
-					}
-
-					// For the sake of comparison we will convert everything to a string
-					stringVal := fmt.Sprintf("%v", v)
-					switch c.ValueType {
-					case "regex":
-						matched, err := regexp.Match(c.Value, []byte(stringVal))
-						if err != nil {
-							return err
-						}
-
-						if !matched {
-							log.Printf("[TRACE] Value %s does not match regex %s in %s (key %s)", stringVal, c.Value, name, c.Key)
-							continue
-						}
-
-						log.Printf("[TRACE] Value %s matches regex %s in %s (key %s)", stringVal, c.Value, name, c.Key)
-						totalMatches++
-
-					case "eq", "":
-						if stringVal != c.Value {
-							log.Printf("[TRACE] Value %s does not match %s in %s (key %s)", stringVal, c.Value, name, c.Key)
-							continue
-						}
-						log.Printf("[TRACE] Value %s matches %s in %s (key %s)", stringVal, c.Value, name, c.Key)
-						totalMatches++
-					}
-				}
-				if totalMatches == totalConditions {
-					log.Printf("[TRACE] All conditions met for %s", name)
-					done = true
-					continue
-				}
-				log.Printf("[TRACE] %d/%d conditions met for %s. Waiting for next ", totalMatches, totalConditions, name)
+			if event.Type == watch.Error {
+				return fmt.Errorf("%s watch error while waiting on wait_for criteria: %v", name, event.Object)
+			}
+			if event.Type != watch.Modified && event.Type != watch.Added {
+				continue
+			}
+			rawResponse, ok := event.Object.(*meta_v1_unstruct.Unstructured)
+			if !ok {
+				return fmt.Errorf("%s could not cast resource to unstructured", name)
+			}
+			matched, mErr := matchesWaitForCriteria(rawResponse, waitFields, waitConditions, name)
+			if mErr != nil {
+				return mErr
+			}
+			if matched {
+				return nil
 			}
 
 		case <-ctx.Done():
 			return fmt.Errorf("%s failed to wait for resource", name)
 		}
 	}
-
-	return nil
 }
 
 // Takes the result of flatmap.Expand for an array of strings
