@@ -1,16 +1,16 @@
-# Wait until a specific field on the live object matches an expected value,
-# using gojsonq-style key paths. All `field` entries must be satisfied before
-# the apply returns.
+# Wait until specific fields on the live object match expected values,
+# using gojsonq-style key paths. All `field` entries must be satisfied
+# before the apply returns.
 
-resource "kubectl_manifest" "pod_ready" {
+resource "kubectl_manifest" "test" {
   wait_for {
     field {
       key   = "status.phase"
       value = "Running"
     }
     field {
-      key   = "status.podIP"
-      value = "^(\\d+(\\.|$)){4}"
+      key        = "status.podIP"
+      value      = "^(\\d+(\\.|$)){4}"
       value_type = "regex"
     }
   }
@@ -19,7 +19,7 @@ resource "kubectl_manifest" "pod_ready" {
 apiVersion: v1
 kind: Pod
 metadata:
-  name: nginx
+  name: name-here
 spec:
   containers:
     - name: nginx

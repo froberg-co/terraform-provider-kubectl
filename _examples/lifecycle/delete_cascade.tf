@@ -7,7 +7,7 @@
 # - "Foreground": the API server blocks until all dependents are deleted
 #   before removing the parent.
 
-resource "kubectl_manifest" "owner" {
+resource "kubectl_manifest" "test" {
   wait           = true
   delete_cascade = "Foreground"
 
@@ -15,18 +15,18 @@ resource "kubectl_manifest" "owner" {
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx
+  name: name-here
   labels:
-    app: nginx
+    app: name-here
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nginx
+      app: name-here
   template:
     metadata:
       labels:
-        app: nginx
+        app: name-here
     spec:
       containers:
         - name: nginx

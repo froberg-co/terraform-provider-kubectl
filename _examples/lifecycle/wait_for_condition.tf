@@ -2,14 +2,10 @@
 # report readiness through standard Kubernetes condition objects (e.g. Pod,
 # Deployment, custom resources with conditions).
 
-resource "kubectl_manifest" "deployment_available" {
+resource "kubectl_manifest" "test" {
   wait_for {
     condition {
       type   = "Available"
-      status = "True"
-    }
-    condition {
-      type   = "Progressing"
       status = "True"
     }
   }
@@ -18,18 +14,18 @@ resource "kubectl_manifest" "deployment_available" {
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx
+  name: name-here
   labels:
-    app: nginx
+    app: name-here
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: nginx
+      app: name-here
   template:
     metadata:
       labels:
-        app: nginx
+        app: name-here
     spec:
       containers:
         - name: nginx
