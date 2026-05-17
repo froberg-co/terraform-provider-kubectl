@@ -58,18 +58,20 @@ func resourceKubectlManifest() *schema.Resource {
 
 	return &schema.Resource{
 		CreateContext: func(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-			// if there is no retry required, perform a simple apply
+			// Fast path: no retries requested, just apply once.
 			if kubectlApplyRetryCount == 0 {
 				if applyErr := resourceKubectlManifestApply(ctx, d, meta); applyErr != nil {
 					return diag.FromErr(applyErr)
 				}
+				return nil
 			}
-			// retry count is not 0, so we need to leverage exponential backoff and multiple retries
+
+			// Retries requested: exponential backoff up to kubectlApplyRetryCount times.
 			exponentialBackoffConfig := backoff.NewExponentialBackOff()
 			exponentialBackoffConfig.InitialInterval = 3 * time.Second
 			exponentialBackoffConfig.MaxInterval = 30 * time.Second
-
 			retryConfig := backoff.WithMaxRetries(exponentialBackoffConfig, kubectlApplyRetryCount)
+
 			retryErr := backoff.Retry(func() error {
 				err := resourceKubectlManifestApply(ctx, d, meta)
 				if err != nil {
@@ -77,7 +79,6 @@ func resourceKubectlManifest() *schema.Resource {
 				}
 				return err
 			}, retryConfig)
-
 			if retryErr != nil {
 				return diag.FromErr(retryErr)
 			}
@@ -532,6 +533,22 @@ var (
 	}
 )
 
+// safeYAMLForLog returns a representation of the manifest body that's safe
+// to write to log.Printf at DEBUG/TRACE. For v1/Secret manifests it omits
+// the data and stringData bodies entirely — those routinely contain
+// credentials, TLS keys, and tokens that would otherwise land in CI log
+// archives whenever TF_LOG=DEBUG is set.
+func safeYAMLForLog(m *yaml.Manifest, yamlBody string) string {
+	if m == nil {
+		return yamlBody
+	}
+	if m.GetAPIVersion() == "v1" && m.GetKind() == "Secret" {
+		return fmt.Sprintf("<redacted v1/Secret body for %s/%s — set TF_LOG_PROVIDER=TRACE if you really need to see it>",
+			m.GetNamespace(), m.GetName())
+	}
+	return yamlBody
+}
+
 // newApplyOptions defines flags and other configuration parameters for the `apply` command
 func newApplyOptions(yamlBody string) *apply.ApplyOptions {
 	applyOptions := &apply.ApplyOptions{
@@ -565,7 +582,7 @@ func resourceKubectlManifestApply(ctx context.Context, d *schema.ResourceData, m
 		manifest.SetNamespace(overrideNamespace.(string))
 	}
 
-	log.Printf("[DEBUG] %v apply kubernetes resource:\n%s", manifest, yamlBody)
+	log.Printf("[DEBUG] %v apply kubernetes resource:\n%s", manifest, safeYAMLForLog(manifest, yamlBody))
 
 	// Create a client to talk to the resource API based on the APIVersion and Kind
 	// defined in the YAML
@@ -786,7 +803,7 @@ func resourceKubectlManifestDelete(ctx context.Context, d *schema.ResourceData, 
 		manifest.SetNamespace(overrideNamespace.(string))
 	}
 
-	log.Printf("[DEBUG] %v delete kubernetes resource:\n%s", manifest, yamlBody)
+	log.Printf("[DEBUG] %v delete kubernetes resource:\n%s", manifest, safeYAMLForLog(manifest, yamlBody))
 
 	restClient := getRestClientFromUnstructured(manifest, meta.(*KubeProvider))
 	if restClient.Error != nil {
@@ -922,7 +939,12 @@ func getRestClientFromUnstructured(manifest *yaml.Manifest, provider *KubeProvid
 	}
 
 	discoveryWithTimeout := func(manifest *yaml.Manifest, provider *KubeProvider) <-chan *RestClientResult {
-		ch := make(chan *RestClientResult)
+		// Buffer size 1 so the goroutine can always deliver its result and
+		// exit, even if the select below picked the timeout branch and
+		// nobody is reading the channel — otherwise the discovery
+		// goroutine would block on send forever (leaking the goroutine
+		// and any resources it holds).
+		ch := make(chan *RestClientResult, 1)
 		go func() {
 			ch <- doGetRestClientFromUnstructured(manifest, provider)
 		}()
@@ -1449,11 +1471,18 @@ func getLiveManifestFields_WithIgnoredFields(ignoredFields []string, userProvide
 	for _, field := range fieldsToTrim {
 		delete(flattenedUser, field)
 
-		// check for any nested fields to ignore
-		for k, _ := range flattenedUser {
-			if strings.HasPrefix(k, field+".") {
-				delete(flattenedUser, k)
+		// Collect nested-field keys first, then delete them — mutating a
+		// map while iterating with `range` is undefined behaviour in Go
+		// (the iterator may visit a deleted key, miss a key, or panic).
+		prefix := field + "."
+		var nested []string
+		for k := range flattenedUser {
+			if strings.HasPrefix(k, prefix) {
+				nested = append(nested, k)
 			}
+		}
+		for _, k := range nested {
+			delete(flattenedUser, k)
 		}
 	}
 

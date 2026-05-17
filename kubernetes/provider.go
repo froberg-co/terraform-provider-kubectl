@@ -53,6 +53,7 @@ func Provider() *schema.Provider {
 			"password": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				DefaultFunc: schema.EnvDefaultFunc("KUBE_PASSWORD", ""),
 				Description: "The password to use for HTTP basic authentication when accessing the Kubernetes master endpoint.",
 			},
@@ -60,23 +61,26 @@ func Provider() *schema.Provider {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				DefaultFunc: schema.EnvDefaultFunc("KUBE_INSECURE", false),
-				Description: "Whether server should be accessed without verifying the TLS certificate.",
+				Description: "Whether server should be accessed without verifying the TLS certificate. WARNING: setting this to true disables TLS verification entirely and exposes the connection to MITM attacks; only enable in trusted networks or for local development.",
 			},
 			"client_certificate": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				DefaultFunc: schema.EnvDefaultFunc("KUBE_CLIENT_CERT_DATA", ""),
 				Description: "PEM-encoded client certificate for TLS authentication.",
 			},
 			"client_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				DefaultFunc: schema.EnvDefaultFunc("KUBE_CLIENT_KEY_DATA", ""),
 				Description: "PEM-encoded client certificate key for TLS authentication.",
 			},
 			"cluster_ca_certificate": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				DefaultFunc: schema.EnvDefaultFunc("KUBE_CLUSTER_CA_CERT_DATA", ""),
 				Description: "PEM-encoded root certificates bundle for TLS authentication.",
 			},
@@ -118,8 +122,9 @@ func Provider() *schema.Provider {
 			"token": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				DefaultFunc: schema.EnvDefaultFunc("KUBE_TOKEN", ""),
-				Description: "Token to authentifcate an service account",
+				Description: "Token to authenticate a service account.",
 			},
 			"proxy_url": {
 				Type:        schema.TypeString,
@@ -154,9 +159,10 @@ func Provider() *schema.Provider {
 							Required: true,
 						},
 						"env": {
-							Type:     schema.TypeMap,
-							Optional: true,
-							Elem:     &schema.Schema{Type: schema.TypeString},
+							Type:      schema.TypeMap,
+							Optional:  true,
+							Sensitive: true,
+							Elem:      &schema.Schema{Type: schema.TypeString},
 						},
 						"args": {
 							Type:     schema.TypeList,
