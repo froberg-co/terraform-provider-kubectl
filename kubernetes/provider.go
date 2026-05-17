@@ -224,7 +224,7 @@ func (p *KubeProvider) ToRESTMapper() (meta.RESTMapper, error) {
 	if discoveryClient != nil {
 		mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 		expander := restmapper.NewShortcutExpander(mapper, discoveryClient, func(a string) {
-			_ = fmt.Errorf("unexpected warning message %s", a) // Fix: Assign the result of fmt.Errorf to a variable or use it in some way.
+			log.Printf("[WARN] error in expander: %s", a)
 		})
 		return expander, nil
 	}
