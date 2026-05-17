@@ -534,17 +534,20 @@ var (
 )
 
 // safeYAMLForLog returns a representation of the manifest body that's safe
-// to write to log.Printf at DEBUG/TRACE. For v1/Secret manifests it omits
-// the data and stringData bodies entirely — those routinely contain
+// to write to log.Printf at DEBUG. For v1/Secret manifests it omits the
+// data and stringData bodies entirely — those routinely contain
 // credentials, TLS keys, and tokens that would otherwise land in CI log
-// archives whenever TF_LOG=DEBUG is set.
+// archives whenever TF_LOG=DEBUG is set. If you need the full Secret
+// body for debugging, retrieve it from the live cluster with
+// `kubectl get secret <name> -n <namespace> -o yaml` rather than from
+// provider logs.
 func safeYAMLForLog(m *yaml.Manifest, yamlBody string) string {
 	if m == nil {
 		return yamlBody
 	}
 	if m.GetAPIVersion() == "v1" && m.GetKind() == "Secret" {
-		return fmt.Sprintf("<redacted v1/Secret body for %s/%s — set TF_LOG_PROVIDER=TRACE if you really need to see it>",
-			m.GetNamespace(), m.GetName())
+		return fmt.Sprintf("<redacted v1/Secret body for %s/%s — inspect on the cluster with `kubectl get secret %s -n %s -o yaml`>",
+			m.GetNamespace(), m.GetName(), m.GetName(), m.GetNamespace())
 	}
 	return yamlBody
 }
