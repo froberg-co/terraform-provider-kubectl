@@ -113,13 +113,13 @@ YAML
 * `force_new` - Optional. Forces delete & create of resources if the `yaml_body` changes. Default `false`.
 * `upgrade_api_version` - Optional. When `true`, changing the `apiVersion` in `yaml_body` updates the resource in-place rather than forcing a delete and recreate. Useful for migrating manifests across API versions (e.g. `autoscaling/v2beta1` → `autoscaling/v2`) without resource churn. Default `false`.
 * `server_side_apply` - Optional. Allow using server-side-apply method. Default `false`.
-* `field_manager` - Optional. Override the default field manager name. This is only relevent when using server-side apply. Default `kubectl`.
-* `force_conflicts` - Optional. Allow using force_conflicts. Default `false`.
-* `apply_only` - Optional. It does not delete resource in any case Default `false`.
+* `field_manager` - Optional. Override the default field manager name. This is only relevant when using server-side apply. Default `kubectl`.
+* `force_conflicts` - Optional. When using server-side apply, force conflicts on field-ownership disputes (equivalent to `kubectl apply --force-conflicts`). Default `false`.
+* `apply_only` - Optional. When `true`, the resource never issues a delete against Kubernetes — Terraform removes it from state but the live object is left intact. Default `false`.
 * `ignore_fields` - Optional. List of map fields to ignore when applying the manifest. See below for more details.
 * `override_namespace` - Optional. Override the namespace to apply the kubernetes resource to, ignoring any declared namespace in the `yaml_body`.
 * `validate_schema` - Optional. Setting to `false` will mimic `kubectl apply --validate=false` mode. Default `true`.
-* `wait` - Optional. Set this flag to wait or not for finalized to complete for deleted objects. Default `false`.
+* `wait` - Optional. When `true`, block the delete operation until the API server confirms the resource is gone. Default `false`.
 * `delete_cascade` - Optional. Cascade mode for delete operations. One of `"Background"` or `"Foreground"`. When unset, defaults to `Background` unless `wait` is enabled, in which case it defaults to `Foreground`. Set this explicitly to match `kubectl`'s behaviour.
 * `wait_for_rollout` - Optional. When `true` (default), wait for the resource to finish rolling out before returning. Supported `kind`s are `Deployment`, `DaemonSet`, `StatefulSet`, and `APIService`.
 * `wait_for`- Optional. If set, will wait until **all** `field` and/or `condition` entries are satisfied, or until timeout is reached (see [below for nested schema](#nestedblock--wait_for)). Field queries use [gojsonq](https://github.com/thedevsaddam/gojsonq) syntax against the live object; condition entries are matched against `status.conditions[]`.
@@ -155,7 +155,7 @@ Required:
 
 ## Attribute Reference
 
-* `yaml_body_parsed` - Obfuscated version of `yaml_body`, with `sensitive_fields` hidden.
+* `yaml_body_parsed` - Sensitive. Obfuscated version of `yaml_body`, with `sensitive_fields` hidden. Marked sensitive so Secret/ConfigMap content is hidden in `terraform plan` output.
 * `api_version` - Extracted API Version from `yaml_body`.
 * `kind` - Extracted object kind from `yaml_body`.
 * `name` - Extracted object name from `yaml_body`.
