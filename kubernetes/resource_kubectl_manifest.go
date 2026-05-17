@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sergi/go-diff/diffmatchpatch"
-
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	k8sdelete "k8s.io/kubectl/pkg/cmd/delete"
 
@@ -286,6 +284,12 @@ metadata:
 			_ = d.SetNew("namespace", parsedYaml.GetNamespace())
 			_ = d.SetNew("name", parsedYaml.GetName())
 
+			// Force recreation when api_version changes unless the user has
+			// opted into in-place api_version upgrades.
+			if !d.Get("upgrade_api_version").(bool) && d.HasChange("api_version") {
+				_ = d.ForceNew("api_version")
+			}
+
 			// set the yaml_body_parsed field to provided value and obfuscate the yaml_body values manually
 			// this allows us to show a nice diff to the users with specific fields obfuscated, whilst storing the
 			// real value to apply in yaml_body
@@ -344,11 +348,11 @@ metadata:
 			stateYaml := d.Get("yaml_incluster").(string)
 			liveStateYaml := d.Get("live_manifest_incluster").(string)
 			if stateYaml != liveStateYaml {
+				// Note: a previous version of this branch generated a patch
+				// diff with sergi/go-diff for the DEBUG log, but that call
+				// can panic on certain inputs (see sergi/go-diff #181). Log
+				// the raw values instead.
 				log.Printf("[TRACE] DETECTED YAML STATE DIFFERENCE %s vs %s", stateYaml, liveStateYaml)
-				dmp := diffmatchpatch.New()
-				patches := dmp.PatchMake(stateYaml, liveStateYaml)
-				patchText := dmp.PatchToText(patches)
-				log.Printf("[DEBUG] DETECTED YAML INCLUSTER STATE DIFFERENCE. Patch diff: %s", patchText)
 				_ = d.SetNewComputed("yaml_incluster")
 			}
 
@@ -389,7 +393,7 @@ var (
 		"yaml_incluster": {
 			Type:      schema.TypeString,
 			Computed:  true,
-			Sensitive: false,
+			Sensitive: true,
 		},
 		"live_manifest_incluster": {
 			Type:      schema.TypeString,
@@ -399,7 +403,9 @@ var (
 		"api_version": {
 			Type:     schema.TypeString,
 			Computed: true,
-			ForceNew: true,
+			// ForceNew is applied conditionally in CustomizeDiff so the
+			// `upgrade_api_version` option can allow in-place updates when
+			// only the api_version changes.
 		},
 		"kind": {
 			Type:     schema.TypeString,
@@ -424,12 +430,13 @@ var (
 		"yaml_body": {
 			Type:      schema.TypeString,
 			Required:  true,
-			Sensitive: false,
+			Sensitive: true,
 		},
 		"yaml_body_parsed": {
 			Type:        schema.TypeString,
 			Description: "Yaml body that is being applied, with sensitive values obfuscated",
 			Computed:    true,
+			Sensitive:   true,
 		},
 		"sensitive_fields": {
 			Type:        schema.TypeList,
@@ -440,6 +447,12 @@ var (
 		"force_new": {
 			Type:        schema.TypeBool,
 			Description: "Default to update in-place. Setting to true will delete and create the kubernetes instead.",
+			Optional:    true,
+			Default:     false,
+		},
+		"upgrade_api_version": {
+			Type:        schema.TypeBool,
+			Description: "When true, changing the api_version in yaml_body will update the resource in-place rather than forcing a delete and recreate. This leverages Kubernetes' ability to represent the same object across multiple API versions.",
 			Optional:    true,
 			Default:     false,
 		},
@@ -526,6 +539,12 @@ var (
 					},
 				},
 			},
+		},
+		"delete_cascade": {
+			Type:             schema.TypeString,
+			Description:      "Cascade mode for delete operations. Set to Background to match kubectl's default. When unset, defaults to Background unless wait is enabled, in which case it defaults to Foreground.",
+			Optional:         true,
+			ValidateDiagFunc: validate2.ToDiagFunc(validate2.StringInSlice([]string{string(meta_v1.DeletePropagationBackground), string(meta_v1.DeletePropagationForeground)}, false)),
 		},
 	}
 )
@@ -736,6 +755,20 @@ func resourceKubectlManifestReadUsingClient(ctx context.Context, d *schema.Resou
 	return nil
 }
 
+// resolveDeletePropagationPolicy picks the DeletionPropagation that will be
+// sent to the API server. The explicit `delete_cascade` value wins; otherwise
+// the policy mirrors kubectl's default (Background) but flips to Foreground
+// when the caller asked us to wait for delete to complete.
+func resolveDeletePropagationPolicy(cascade string, wait bool) meta_v1.DeletionPropagation {
+	if cascade != "" {
+		return meta_v1.DeletionPropagation(cascade)
+	}
+	if wait {
+		return meta_v1.DeletePropagationForeground
+	}
+	return meta_v1.DeletePropagationBackground
+}
+
 func resourceKubectlManifestDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) error {
 	if d.Get("apply_only").(bool) {
 		return nil
@@ -759,11 +792,8 @@ func resourceKubectlManifestDelete(ctx context.Context, d *schema.ResourceData, 
 
 	log.Printf("[INFO] %s perform delete of manifest", manifest)
 
-	propagationPolicy := meta_v1.DeletePropagationBackground
 	waitForDelete := d.Get("wait").(bool)
-	if waitForDelete {
-		propagationPolicy = meta_v1.DeletePropagationForeground
-	}
+	propagationPolicy := resolveDeletePropagationPolicy(d.Get("delete_cascade").(string), waitForDelete)
 	err = restClient.ResourceInterface.Delete(ctx, manifest.GetName(), meta_v1.DeleteOptions{PropagationPolicy: &propagationPolicy})
 	resourceGone := errors.IsGone(err) || errors.IsNotFound(err)
 	if err != nil && !resourceGone {
@@ -1072,10 +1102,13 @@ func getLiveManifestFields_WithIgnoredFields(ignoredFields []string, userProvide
 	// so we will do a small lifehack here
 	if userProvided.GetKind() == "Secret" && userProvided.GetAPIVersion() == "v1" {
 		if stringData, found := userProvided.Raw.Object["stringData"]; found {
-			// move all stringdata values to the data
-			for k, v := range stringData.(map[string]interface{}) {
-				encodedString := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%v", v)))
-				meta_v1_unstruct.SetNestedField(userProvided.Raw.Object, encodedString, "data", k)
+			// stringData may be present but typed as nil (e.g. `stringData:`
+			// with no children); guard the type assertion so we don't panic.
+			if stringDataMap, ok := stringData.(map[string]interface{}); ok {
+				for k, v := range stringDataMap {
+					encodedString := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%v", v)))
+					meta_v1_unstruct.SetNestedField(userProvided.Raw.Object, encodedString, "data", k)
+				}
 			}
 			// and unset the stringData entirely
 			meta_v1_unstruct.RemoveNestedField(userProvided.Raw.Object, "stringData")
