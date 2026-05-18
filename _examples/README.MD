@@ -17,16 +17,13 @@
 - [Create a ClusterRole](./roles/clusterrole.tf)
 - [Dynamic Secret from variable](./secrets/dynamic_secret.tf)
 
-## Workloads
-
-- [Single-node CockroachDB StatefulSet](./cockroachdb/single_node.tf) — insecure-mode standalone instance backed by `emptyDir`; swap for a PVC + TLS in production.
-
 ## Patterns documented elsewhere
 
-Some examples live outside `_examples/` because they require cluster-side prerequisites that the acceptance-test walker can't satisfy (custom CRDs, operators, etc.):
+Some examples live outside `_examples/` because they require cluster-side prerequisites (custom CRDs, operators) or workloads (big container images, slow startup) that the acceptance-test walker can't satisfy in a reasonable amount of time:
 
 - [Install ArgoCD](../docs/guides/install-argocd.md) — fetch the upstream install YAML, split it with `kubectl_file_documents`, and manage every document as its own `kubectl_manifest`.
 - [Install the CockroachDB operator via an ArgoCD ApplicationSet](../docs/guides/argocd-cockroachdb-operator.md) — declares an ArgoCD `ApplicationSet` that installs `cockroach-operator` from Helm.
+- [Run single-node CockroachDB on Kubernetes](../docs/guides/single-node-cockroachdb.md) — a StatefulSet + headless Service running `cockroachdb/cockroach` in insecure single-node mode against an emptyDir.
 
 ## CRDs
 
