@@ -1,13 +1,8 @@
 # Resource: kubectl_manifest
 
-Create a Kubernetes resource using raw YAML manifests.
+Manages a Kubernetes object declared as raw YAML. Internally uses the same code path as `kubectl apply`: edit the `yaml_body` and the live object is updated in place, with full lifecycle (create / update / delete / drift detection) tracked by Terraform.
 
-This resource handles creation, deletion and even updating your Kubernetes resources. This allows complete lifecycle management of your Kubernetes resources as terraform resources!
-
-Behind the scenes, this provider uses the same capability as the `kubectl apply` command, that is, you can update the YAML inline and the resource will be updated in place in Kubernetes.
-
-> **TIP:** This resource only supports a single yaml resource. If you have a list of documents in your yaml file,
-> use the [kubectl_path_documents](https://registry.terraform.io/providers/froberg-co/kubectl/latest/docs/data-sources/kubectl_path_documents) data source to split the files into individual resources.
+> **Tip:** one document per resource. For multi-document files use the [`kubectl_path_documents`](https://registry.terraform.io/providers/froberg-co/kubectl/latest/docs/data-sources/kubectl_path_documents) data source to split them into individual `kubectl_manifest` resources.
 
 ## Example Usage
 
@@ -34,12 +29,13 @@ YAML
 }
 ```
 
-> Note: When the kind is a Deployment, this provider will wait for the deployment to be rolled out automatically for you!
+> Note: rollout waits for `Deployment`, `DaemonSet`, `StatefulSet`, and `APIService` are enabled by default — see [Waiting for Rollout](#waiting-for-rollout) below.
 
 ### With explicit `wait_for`
-If `wait_for` is specified, upon applying the resource, the provider will wait for **all** declared `field` and `condition` entries to be satisfied before proceeding. At least one `field` or `condition` block must be present.
 
-#### Matching fields (gojsonq paths against the live object)
+The `wait_for` block blocks the apply until **every** declared `field` and `condition` entry is satisfied. At least one entry is required.
+
+#### Field matchers (gojsonq paths)
 
 
 ```hcl
@@ -77,7 +73,7 @@ YAML
 }
 ```
 
-#### Matching `status.conditions[]` entries
+#### Status-condition matchers
 
 ```hcl
 resource "kubectl_manifest" "test" {
@@ -104,22 +100,22 @@ YAML
 }
 ```
 
-`field` and `condition` blocks can be combined; the resource is considered ready only when **every** entry across both block types is satisfied.
+`field` and `condition` blocks may be combined — the resource is considered ready only once **every** entry across both types is satisfied.
 
 ## Argument Reference
 
 * `yaml_body` - Required. YAML to apply to kubernetes.
-* `sensitive_fields` - Optional. List of fields (dot-syntax) which are sensitive and should be obfuscated in output. Defaults to `["data"]` for Secrets.
+* `sensitive_fields` - Optional. List of fields (dot-syntax) which are sensitive and should be obfuscated in output. Defaults to `["data", "stringData"]` for `v1/Secret` manifests.
 * `force_new` - Optional. Forces delete & create of resources if the `yaml_body` changes. Default `false`.
 * `upgrade_api_version` - Optional. When `true`, changing the `apiVersion` in `yaml_body` updates the resource in-place rather than forcing a delete and recreate. Useful for migrating manifests across API versions (e.g. `autoscaling/v2beta1` → `autoscaling/v2`) without resource churn. Default `false`.
 * `server_side_apply` - Optional. Allow using server-side-apply method. Default `false`.
-* `field_manager` - Optional. Override the default field manager name. This is only relevent when using server-side apply. Default `kubectl`.
-* `force_conflicts` - Optional. Allow using force_conflicts. Default `false`.
-* `apply_only` - Optional. It does not delete resource in any case Default `false`.
+* `field_manager` - Optional. Override the default field manager name. This is only relevant when using server-side apply. Default `kubectl`.
+* `force_conflicts` - Optional. When using server-side apply, force conflicts on field-ownership disputes (equivalent to `kubectl apply --force-conflicts`). Default `false`.
+* `apply_only` - Optional. When `true`, the resource never issues a delete against Kubernetes — Terraform removes it from state but the live object is left intact. Default `false`.
 * `ignore_fields` - Optional. List of map fields to ignore when applying the manifest. See below for more details.
 * `override_namespace` - Optional. Override the namespace to apply the kubernetes resource to, ignoring any declared namespace in the `yaml_body`.
 * `validate_schema` - Optional. Setting to `false` will mimic `kubectl apply --validate=false` mode. Default `true`.
-* `wait` - Optional. Set this flag to wait or not for finalized to complete for deleted objects. Default `false`.
+* `wait` - Optional. When `true`, block the delete operation until the API server confirms the resource is gone. Default `false`.
 * `delete_cascade` - Optional. Cascade mode for delete operations. One of `"Background"` or `"Foreground"`. When unset, defaults to `Background` unless `wait` is enabled, in which case it defaults to `Foreground`. Set this explicitly to match `kubectl`'s behaviour.
 * `wait_for_rollout` - Optional. When `true` (default), wait for the resource to finish rolling out before returning. Supported `kind`s are `Deployment`, `DaemonSet`, `StatefulSet`, and `APIService`.
 * `wait_for`- Optional. If set, will wait until **all** `field` and/or `condition` entries are satisfied, or until timeout is reached (see [below for nested schema](#nestedblock--wait_for)). Field queries use [gojsonq](https://github.com/thedevsaddam/gojsonq) syntax against the live object; condition entries are matched against `status.conditions[]`.
@@ -155,7 +151,7 @@ Required:
 
 ## Attribute Reference
 
-* `yaml_body_parsed` - Obfuscated version of `yaml_body`, with `sensitive_fields` hidden.
+* `yaml_body_parsed` - Sensitive. Obfuscated version of `yaml_body`, with `sensitive_fields` hidden. Marked sensitive so Secret/ConfigMap content is hidden in `terraform plan` output.
 * `api_version` - Extracted API Version from `yaml_body`.
 * `kind` - Extracted object kind from `yaml_body`.
 * `name` - Extracted object name from `yaml_body`.
@@ -167,11 +163,7 @@ Required:
 
 ## Sensitive Fields
 
-You can obfuscate fields in the diff output by setting the `sensitive_fields` option. This allows you to hide arbitrary field content by suppressing the information in the diff.
-
-By default, this is set to `["data"]` for all `v1/Secret` manifests.
-
-The fields provided should use dot-separator syntax to specify the field to obfuscate.
+`sensitive_fields` obfuscates the given fields in `terraform plan` output. For `v1/Secret` manifests the default is `["data", "stringData"]`; specify it explicitly to obfuscate fields on other kinds. Use dot-separator syntax for nested keys.
 
 ```hcl
 resource "kubectl_manifest" "test" {
@@ -193,15 +185,13 @@ YAML
 }
 ```
 
-> Note: Only Map values are supported to be made sensitive. If you need to make a value from a list (or sub-list) sensitive, you can set the high-level key as sensitive to suppress the entire tree output.
-
+> Note: only map values can be obfuscated individually. To hide a list (or a sub-list element), mark the parent key sensitive — the entire subtree will be redacted.
 
 ## Ignore Manifest Fields
 
-You can configure a list of yaml keys to ignore changes to via the `ignore_fields` field.
-Set these for fields set by Operators or other processes in kubernetes and as such you don't want to update.
+`ignore_fields` skips drift detection on the listed keys — typically used when a controller (HPA, operator, mutating webhook) owns specific fields you don't want Terraform to fight.
 
-By default, the following control fields are ignored:
+The following fields are always ignored as control metadata:
   - `status`
   - `metadata.finalizers`
   - `metadata.initializers`
@@ -212,9 +202,7 @@ By default, the following control fields are ignored:
   - `metadata.uid`
   - `metadata.annotations.kubectl.kubernetes.io/last-applied-configuration`
 
-These syntax matches the Terraform style flattened-map syntax, whereby keys are separated by `.` paths.
-
-For example, to ignore the `annotations`, set the `ignore_fields` path to `metadata.annotations`:
+Paths use Terraform's flattened-map syntax — `.`-separated keys. For example, to ignore the `annotations` map entirely:
 
 ```hcl
 resource "kubectl_manifest" "test" {
@@ -232,8 +220,7 @@ YAML
 }
 ```
 
-For arrays, the syntax is indexed based on the element position. For example, to ignore the `caBundle` field in the
-below manifest, would be: `webhooks.0.clientConfig.caBundle`
+Array elements are addressed by position. To ignore the `caBundle` inside the first webhook of the manifest below, use `webhooks.0.clientConfig.caBundle`:
 
 ```hcl
 resource "kubectl_manifest" "test" {
@@ -255,23 +242,23 @@ More examples can be found in the provider tests.
 
 ## Waiting for Rollout
 
-By default, this resource will wait for the following kinds to complete their rollout before proceeding:
+By default, the apply blocks until the live object reaches a steady state for these kinds:
 
-- `Deployment` — wait until the desired number of replicas are updated and available.
-- `DaemonSet` — wait until all desired pods are scheduled and ready.
-- `StatefulSet` — wait until the rolling update completes and replicas match the spec.
-- `APIService` — wait until the service is reported as available.
+- `Deployment` — desired replicas are updated and available.
+- `DaemonSet` — all desired pods are scheduled and ready.
+- `StatefulSet` — the rolling update completes and replicas match the spec.
+- `APIService` — the service reports as available.
 
-You can disable this behaviour by setting `wait_for_rollout = false` on the resource.
+Set `wait_for_rollout = false` to skip the wait.
 
 ## Import
 
-This provider supports importing existing resources. The ID format expected uses a double `//` as a deliminator (as apiVersion can have a forward-slash):
+Existing objects can be imported. The ID uses `//` as the separator (since `apiVersion` itself can contain `/`):
 
 ```
-# Import the my-namespace Namespace
+# Cluster-scoped object: <apiVersion>//<Kind>//<name>
 terraform import kubectl_manifest.my-namespace v1//Namespace//my-namespace
 
-# Import the certmanager Issuer CRD named cluster-selfsigned-issuer-root-ca from the my-namespace namespace
-$ terraform import -provider kubectl module.kubernetes.kubectl_manifest.crd-example certmanager.k8s.io/v1alpha1//Issuer//cluster-selfsigned-issuer-root-ca//my-namespace
+# Namespaced object: <apiVersion>//<Kind>//<name>//<namespace>
+terraform import kubectl_manifest.crd-example certmanager.k8s.io/v1alpha1//Issuer//cluster-selfsigned-issuer-root-ca//my-namespace
 ```

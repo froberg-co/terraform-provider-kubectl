@@ -1,13 +1,12 @@
 # Data Source: kubectl_file_documents
 
-This provider provides a `data` resource `kubectl_file_documents` to enable ease of splitting multi-document yaml content.
+Splits a multi-document YAML string (separated by `---`) into individual documents that can be applied as separate `kubectl_manifest` resources.
 
 ## Example Usage
 
-### Example Usage with for_each
+### With for_each (recommended)
 
-The recommended approach is to use the `manifests` attribute and a `for_each` expression to apply the found manifests.
-This ensures that any additional yaml documents or removals do not cause a large amount of terraform changes.
+Use the `manifests` attribute with `for_each` — adding or removing a document doesn't churn unrelated resources.
 
 ```hcl
 data "kubectl_file_documents" "docs" {
@@ -20,9 +19,11 @@ resource "kubectl_manifest" "test" {
 }
 ```
 
-### Example Usage via count
+### With count
 
-Raw documents can also be accessed via the `documents` attribute.
+`documents` exposes the raw list, indexable by position.
+
+> Caveat: with `count`, reordering or inserting a document mid-list causes Terraform to destroy and recreate everything that shifts index — prefer `for_each` unless ordering is guaranteed.
 
 ```hcl
 data "kubectl_file_documents" "docs" {
@@ -37,5 +38,5 @@ resource "kubectl_manifest" "test" {
 
 ## Attribute Reference
 
-* `manifests` - Map of YAML documents with key being the document id, and value being the document yaml. Best used with `for_each` expressions.
-* `documents` - List of raw YAML documents (string). Best used with `count` expressions.
+* `manifests` - Map keyed by a stable document ID, valued by the document YAML. Best paired with `for_each`.
+* `documents` - List of raw YAML documents. Best paired with `count` (see caveat above).

@@ -96,49 +96,41 @@ See [User Guide](https://registry.terraform.io/providers/froberg-co/kubectl/late
 
 ## Development Guide
 
-If you wish to work on the provider, you'll first need [Go](http://www.golang.org) installed on your machine (version 1.12+ is *required*).
-You'll also need to correctly setup a [GOPATH](http://golang.org/doc/code.html#GOPATH), as well as adding `$GOPATH/bin` to your `$PATH`.
+If you wish to work on the provider, you'll first need [Go](https://golang.org) installed on your machine. The minimum required version tracks the `go` directive in `go.mod` (currently **Go 1.26+**); `actions/setup-go@v5` in CI auto-installs the right toolchain from `go.mod`, and local builds will do the same if `GOTOOLCHAIN=auto` (the default since Go 1.21).
+
+You'll also need `$GOPATH/bin` on your `$PATH` so the built provider binary is discoverable.
 
 To compile the provider, run `make build`. This will build the provider and put the provider binary in the `$GOPATH/bin` directory.
 
 ### Building The Provider
 
-You can build the master branch of the provider by running 
+You can build the master branch of the provider by running
 ```sh
-git clone github.com/froberg-co/terraform-provider-kubectl
+git clone https://github.com/froberg-co/terraform-provider-kubectl.git
 cd terraform-provider-kubectl
 make build
 ```
-This will build an executable `terraform-provider-kubectl` in your `${GOPATH}/bin/` directory. 
-Now we need to tell Terraform to override remote versions with our local build. To do so create/edit `~/.terraformrc/` file and add following content to it:
+This will build an executable `terraform-provider-kubectl` in your `${GOPATH}/bin/` directory.
+
+Now tell Terraform to use that local build instead of the published release. Create or edit `~/.terraformrc` and add the following, replacing `/Users/USERNAME/go/bin` with the directory containing your built binary:
+
 ```hcl
- provider_installation {
+provider_installation {
   dev_overrides {
-    "froberg-co/kubectl" = "/Users/USERNAME/go/bin/"
+    "froberg-co/kubectl" = "/Users/USERNAME/go/bin"
   }
   direct {}
 }
 ```
 
-change "/Users/USERNAME/go/bin/" with the path where your go has placed built executable. After that all you have to do is run 
-`terraform init` and you will be using the new version. 
+After that, an *initial* `terraform init` is still needed in a fresh working directory (to create `.terraform/` and resolve modules), but you don't need to re-run init between rebuilds — `terraform plan` / `apply` pick up the new binary on every invocation. You should see this warning each time you run Terraform with the override in effect:
 
-If all went well, you should see a following message during the apply:
 ```text
 ╷
 │ Warning: Provider development overrides are in effect
-│ 
+│
 │ The following provider development overrides are set in the CLI configuration:
 │  - froberg-co/kubectl in /Users/USERNAME/go/bin
-
-$ go get github.com/froberg-co/terraform-provider-kubectl
-```
-
-Enter the provider directory and build the provider
-
-```sh
-$ cd $GOPATH/src/github.com/froberg-co/terraform-provider-kubectl
-$ make build
 ```
 
 ### Testing
@@ -149,7 +141,7 @@ In order to test the provider, you can simply run `make test`.
 $ make test
 ```
 
-The provider uses k3s to run integration tests. These tests look for any `*.tf` files in the `_examples` folder and run an `plan`, `apply`, `refresh` and `plan` loop over each file. 
+The provider uses [kind](https://kind.sigs.k8s.io/) to run integration tests against a real Kubernetes API server. These tests walk every `*.tf` file in `_examples/` and run a `plan`, `apply`, `refresh`, `plan` loop against each one.
 
 Inside each file the string `name-here` is replaced with a unique name during test execution. This is a simple string replace before the TF is applied to ensure that tests don't fail due to naming clashes. 
 
