@@ -36,6 +36,12 @@ func ParseYAML(yaml string) (*Manifest, error) {
 		Raw: &unstruct,
 	}
 
-	log.Printf("[DEBUG] %s Unstructed YAML: %+v\n", manifest, manifest.Raw.UnstructuredContent())
+	// Log only the identifying metadata at DEBUG. Previously this dumped
+	// the full UnstructuredContent which includes Secret data/stringData —
+	// any caller running with TF_LOG=DEBUG ended up with Secret material
+	// in their log archives. If you need the full payload for debugging,
+	// fetch it with `kubectl get <kind>/<name> -n <namespace> -o yaml`.
+	log.Printf("[DEBUG] %s parsed manifest: apiVersion=%s kind=%s namespace=%s name=%s",
+		manifest, manifest.GetAPIVersion(), manifest.GetKind(), manifest.GetNamespace(), manifest.GetName())
 	return manifest, nil
 }
